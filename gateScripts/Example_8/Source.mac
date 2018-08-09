@@ -1,0 +1,39 @@
+#==========================================================================================
+# ABOUT THIS MACRO
+# Description: Definition of source - its type, shape, position, activity, etc.
+# Author: Mateusz Bała
+# E-mail: bala.mateusz@gmail.com
+#==========================================================================================
+
+
+#==========================================================================================
+# Definition of point source
+# Source below is point at position (0,0,0) cm with activity 1 kBq. Mode of this source is
+# JPETSource which offers three types of source: SGJPET (single gamma), pPsJPET (2 gammas
+# from pPs decay) and oPsJPET (3 gammas from oPs decay). Here we use pPsJPEt type.
+# These gammas momentum direction has spherical uniform distribution
+#==========================================================================================
+
+/gate/source/addSource PointSource JPETSource
+/gate/source/PointSource/gps/type Point
+/gate/source/PointSource/gps/pos/centre 0 0 0 cm
+/gate/source/PointSource/setActivity 1 kBq
+/gate/source/PointSource/setType pPsAndPropmtJPET
+/gate/source/PointSource/setUseUnpolarizedParticles FALSE
+/gate/source/PointSource/setSeedForRandomGenerator 10
+/gate/source/PointSource/setPromptGammaEnergy 1.157 MeV
+/gate/source/PointSource/gps/particle gamma
+
+# This options control distribution of gammas momentum directions
+/gate/source/PointSource/gps/angtype iso
+/gate/source/PointSource/gps/mintheta 0. deg
+/gate/source/PointSource/gps/maxtheta 180. deg
+/gate/source/PointSource/gps/minphi 0. deg
+/gate/source/PointSource/gps/maxphi 360. deg
+
+
+#==========================================================================================
+# Initialization of sources
+#==========================================================================================
+
+/gate/source/list

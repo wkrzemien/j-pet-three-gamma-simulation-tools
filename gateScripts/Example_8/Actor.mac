@@ -1,0 +1,64 @@
+#============================================================================================
+# ABOUT THIS MACRO
+# Description: This macro  describes what and when save from simulation to output file.
+# One of methods is using Global and Local Actor. Local Actor can be attached to selected
+# volume in simulation system and observe each one track (particle) propagating throw this
+# volume. You can choose which data save and when ( e.g. save data only for gammas which
+# has scattered in Compton process). Global take under consideration this conditions 
+# and save data only for particles which met the conditions. Output file can be read
+# by Global Actor Reader or in the another way by ROOT Framework.
+# Author: Mateusz Bała
+# E-mail: bala.mateusz@gmail.com
+#============================================================================================
+
+#============================================================================================
+# Creating local actor and attaching it to selected volume (here "detector" from Geometry.mac)
+#============================================================================================
+#/gate/actor/addActor LocalActor JA_A
+#/gate/actor/JA_A/attachTo box_with_water
+
+/gate/actor/addActor LocalActor JPActor
+/gate/actor/JPActor/attachTo crystal1
+
+/gate/actor/addActor LocalActor JPActor2
+/gate/actor/JPActor2/attachTo crystal2
+
+/gate/actor/addActor LocalActor JPActor3
+/gate/actor/JPActor3/attachTo crystal3
+#============================================================================================
+# Setting up global actor
+# Commands "enable" describe what save, while commands "filter" describe saving conditions.
+# Description of all enable commands for Global Actor can be found in repository directory:
+# source/digits_hits/src/GateGlobalActorMessenger.cc
+#============================================================================================
+
+/gate/actor/JPActor/global/saveTo example8.root #where save data
+
+#============================================================================================
+# Enable commands
+#
+# Try this: if you comment out some below lines you will receive less data
+#============================================================================================
+
+/gate/actor/JPActor/global/enableEventID
+/gate/actor/JPActor/global/enableTrackID
+/gate/actor/JPActor/global/enableProcessName
+/gate/actor/JPActor/global/enableProcessPosition
+/gate/actor/JPActor/global/enableEmissionPointFromSource
+/gate/actor/JPActor/global/enableEmissionEnergyFromSource
+/gate/actor/JPActor/global/enableEnergyBeforeProcess
+/gate/actor/JPActor/global/enableEnergyAfterProcess
+/gate/actor/JPActor/global/enableEnergyLossDuringProcess
+/gate/actor/JPActor/global/enableVolumeName
+
+#============================================================================================
+# Saving conditions - filter commands
+#
+# Try this: if you comment out below lines with "#" you will receive a lot of data for
+# different processes and particles. Otherwise you will have only data for gamma which
+# dispersed in Compton scattering
+#============================================================================================
+
+/gate/actor/JPActor/global/filterParticleName gamma #save only data for gamma, this command can be called more then once
+/gate/actor/JPActor/global/filterProcessName Compton #save only for process with name "Compton"
+
