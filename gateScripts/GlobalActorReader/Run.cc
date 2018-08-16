@@ -3,264 +3,346 @@
 #include <stdexcept>
 #include "TCanvas.h"
 #include "TH1F.h"
-#include<string>
+#include <string>
 #include <TRandom3.h>
 #include <TMath.h>
 #include <algorithm>
 #include <TGraph.h>
 #include <TLegend.h>
+#include <TFile.h>
+#include <cmath>
+#include <TLorentzVector.h>
+#include <cassert>
 
 using namespace std;
 
+struct FullEvent {
+  FullEvent()
+  {
+    reset();
+  }
 
-/***
-CO ROBI TEN PRZYKŁADOWY KOD:
-Rozróżni czy rozproszenie nastąpiło w objętości z wodą czy w geometrii.
-Na podstawie tych informacji wykręsla histogramy:
-1. depozycja energii w objętości z wodą - patrzymy tylko na pierwsze rozproszenie w wodzie - jak chcecie mieć mięcej rozproszeń zarejestrowanych to trzeba odpowiedni kod napisać
-2. depozycja ogólnie w geometrii detektora podczas pierwszego rozproszenie Comptonowskiego w tym detektrorze - czyli może ale nie musi być tu gamma rozproszona w wodzie ( jeśli byście chcieli badać kolejne rozproszenia to konieczne jest sprawdzanie wektora położenia scyntylatora - bo mogą i zachodzą wielokrotne rozproszenia w scyntylatorach nawet dla tej geometrii)
-3. depozycja energii w geometrii detektora tylko przez gammy które rozproszyły się wcześniej w objętości z wodą
+  int fEventID = -1;
+  TLorentzVector gammaPrompt;
+  TLorentzVector gamma1;
+  TLorentzVector gamma2;
+  bool gammaPromptScatteredInWater = false;
+  bool gamma1ScatteredInWater = false;
+  bool gamma2ScatteredInWater = false;
 
-Zauważcie, że tutaj nie interesuje nas w której konkretnej warstwie nastąpiło rozproszenie - dlatego nie trzeba sprawdzać nazw warstw detektora. Jeśli chcielibyście robić studium dla konkretnych warstw detektora to już trzeba dodać odpowiednie sprawdzania.
-
-Ten kod ma taką a nie inną formę ponieważ wiemy na podstawie konfiguracji actora, że:
-1. rejestrujemy tylko gammy
-2. rejestrujemy tylko Comptona
-***/
-Double_t sigmaE(Double_t E, Double_t coeff = 0.0444)
-{
-	return coeff / TMath::Sqrt(E) * E;
-}
-
-
-struct AnalysisVariables
-{
- int fEventID;
-
- bool fGammaScattered511ForTrack1; //gamma rozproszone przed  
- bool fGammaScatteredPromptForTrack1;
-
- bool fGammaScattered511ForTrack2;
- //bool fGammaScatteredInDetectorForTrack2;
-
- double fEnergyDeposition511ForTrack1;
- double fEnergyDepositionPromptForTrack1;
-
- double fEnergyDeposition511ForTrack2;
- //double fEnergyDepositionPromptForTrack2;
-
- void init();
- void reset( int eventID );
+  void reset()
+  {
+    gamma1.SetXYZT(0, 0, 0, -1);
+    gamma2.SetXYZT(0, 0, 0, -1);
+    gammaPrompt.SetXYZT(0, 0, 0, -1);
+    gammaPromptScatteredInWater = false;
+    gamma1ScatteredInWater = false;
+    gamma2ScatteredInWater = false;
+  }
 };
-
-void AnalysisVariables::init()
-{
- reset( -1 );
-}
-
-void AnalysisVariables::reset( int eventID )
-{
-fEventID = eventID;
- fGammaScattered511ForTrack1 = fGammaScatteredPromptForTrack1 = fGammaScattered511ForTrack2 = false;
- fEnergyDeposition511ForTrack1 = fEnergyDepositionPromptForTrack1 = fEnergyDeposition511ForTrack2 = 0;
-}
 
 random_device rd;
 mt19937 gen(rd());
 
-double r_norm(double mean, double sigmaE){
-    normal_distribution<double> d(mean, sigmaE);
-    return d(gen);
+Double_t sigmaE(Double_t E, Double_t coeff = 0.0444)
+{
+  return coeff / TMath::Sqrt(E) * E;
 }
 
-void Check( GlobalActorReader& gar, AnalysisVariables& av,  TH1F& h511, TH1F& hPrompt, TH1F& h5112, TH1F& hPrompt2)
+double r_norm(double mean, double sigmaE)
 {
- int eventID = gar.GetEventID();
- int trackID = gar.GetTrackID();
+  normal_distribution<double> d(mean, sigmaE);
+  return d(gen);
+}
+
+bool isEqual(double x, double y, double epsilon = 10e-9)
+{
+  return std::abs(x - y) < epsilon;
+}
+
+double smearEnergy(double energy)
+{
+  return r_norm(energy, 1000. * sigmaE((energy) * 1. / 1000.));
+}
+
+/// return true if full event has been read.
+/// Track1 ==> prompt
+/// Track2 ==> 511 keV
+/// Track3 ==> 511 keV
+bool readEvent(const GlobalActorReader& gar, const std::string& water_volume_name, FullEvent& outEvent)
+{
+  int trackID = gar.GetTrackID();
+  std::string volume_name = gar.GetVolumeName();
   double energyDeposition = gar.GetEnergyLossDuringProcess();
   double emissionEnergy = gar.GetEmissionEnergyFromSource();
+  auto hitPosition = gar.GetProcessPosition(); /// I am not sure here
 
- if ( av.fEventID != eventID )
- {
-  //Skoro tutaj jesteśmy to znaczy, że zaczynamy nowy event
-  if ( av.fEventID > -1 )
-  {
-   //A jeśli tu jesteśmy to znaczy, że nie jest to pierwszy event, który jest w pliku, lecz kolejny i można próbować go zapisać
-
-   if ( av.fGammaScattered511ForTrack1 )
-	   h5112.Fill(av.fEnergyDeposition511ForTrack1);
-   		h511.Fill(r_norm(av.fEnergyDeposition511ForTrack1, 1000 * sigmaE((av.fEnergyDeposition511ForTrack1) * 1 / 1000)));
-   if ( av.fGammaScatteredPromptForTrack1 )
-   {
-	   hPrompt2.Fill(av.fEnergyDepositionPromptForTrack1);
-	   hPrompt.Fill(r_norm(av.fEnergyDepositionPromptForTrack1, 1000 * sigmaE((av.fEnergyDepositionPromptForTrack1) * 1 / 1000)));
+  int currentEventID = gar.GetEventID();
+  int previousEventID = outEvent.fEventID;
+  if ( previousEventID != currentEventID ) {
+    if ( previousEventID > -1 ) {
+      outEvent.fEventID = currentEventID; /// we save new eventID to outEvent
+      return true;
+    } else {
+      outEvent.fEventID = currentEventID; /// this is the first event starting
+      return false;
     }
+  }
 
-   if ( av.fGammaScattered511ForTrack2 )
-    {
-    h5112.Fill( av.fEnergyDeposition511ForTrack2 );
-    h511.Fill(r_norm(av.fEnergyDeposition511ForTrack2, 1000 * sigmaE((av.fEnergyDeposition511ForTrack2) * 1 / 1000)));
+/// if there is multiple scattering we save only the last part
+  if ( volume_name == water_volume_name ) {
+    /// scatter in volume
+    if (trackID == 1) {
+      assert(!isEqual(emissionEnergy, 511));
+      assert(isEqual(emissionEnergy, 1157));
+      outEvent.gammaPromptScatteredInWater = true;
+    }
+    if (trackID == 2) {
+      assert(isEqual(emissionEnergy, 511));
+      assert(!isEqual(emissionEnergy, 1157));
+      outEvent.gamma1ScatteredInWater = true;
+    }
+    if (trackID == 3) {
+      assert(isEqual(emissionEnergy, 511));
+      assert(!isEqual(emissionEnergy, 1157));
+      outEvent.gamma2ScatteredInWater = true;
+    }
+  } else {
+    /// scatter in detector
+    if (trackID == 1) {
+      assert(!isEqual(emissionEnergy, 511));
+      assert(isEqual(emissionEnergy, 1157));
+      outEvent.gammaPrompt = TLorentzVector(hitPosition, energyDeposition);
+    }
+    if (trackID == 2) {
+      assert(isEqual(emissionEnergy, 511));
+      assert(!isEqual(emissionEnergy, 1157));
+      outEvent.gamma1 = TLorentzVector(hitPosition, energyDeposition);
+    }
+    if (trackID == 3) {
+      assert(isEqual(emissionEnergy, 511));
+      assert(!isEqual(emissionEnergy, 1157));
+      outEvent.gamma2 = TLorentzVector(hitPosition, energyDeposition);
+    }
   }
-  if ( av.fGammaScattered511ForTrack2 )
-    {
-    h5112.Fill( av.fEnergyDeposition511ForTrack2 );
-    h511.Fill(r_norm(av.fEnergyDeposition511ForTrack2, 1000 * sigmaE((av.fEnergyDeposition511ForTrack2) * 1 / 1000)));
-  }
-    
-   
-   //Zapisaliśmy dane do histogramu - o ile było co zapisywać
-  }
-  //Resetujemy dane dla nowego eventu aby poprawnie rozpoznawać zdarzenia
-  av.reset( eventID );
- }
-
- //Sprawdzamy z jakim rozproszeniem mamy doczynienie
- if ( emissionEnergy == 511 )
- {
-  //Czyli mamy do czynienia z 511
-
-  if ( trackID == 1 && !av.fGammaScattered511ForTrack1 )
-  {
-   //Czyli mamy pierwsze rozporszenie w wodzie dla track ID = 1
-   av.fGammaScattered511ForTrack1 = true; //w ten sposób oznaczam, że już zarajestrowałem pierwszą gamma rozproszenie w wodzie dla trackID=1
-   av.fEnergyDeposition511ForTrack1 = energyDeposition;
-  }
-  else if ( trackID == 2 && !av.fGammaScattered511ForTrack2 )
-  {
-   //Czyli mamy pierwsze rozporszenie w wodzie dla track ID = 2
-   av.fGammaScattered511ForTrack2 = true; //w ten sposób oznaczam, że już zarajestrowałem pierwszą gamma rozproszenie w wodzie dla trackID=1
-   av.fEnergyDeposition511ForTrack2 = energyDeposition;
-  }
- }
- else
- {
-  //Skoro nie 511 to musi być to 1147
-
-  if ( trackID == 1 && !av.fGammaScatteredPromptForTrack1 )
-  {
-   av.fGammaScatteredPromptForTrack1 = true;
-   av.fEnergyDepositionPromptForTrack1 = energyDeposition;
-  }
- }
-
+  return false;
 }
 
+TH1F* hAllPrompt = 0;
+TH1F* hScatteredinPhantomPrompt  = 0;
+TH1F* hNotScatteredinPhantomPrompt  = 0;
+TH1F* hAll511 = 0;
+TH1F* hScatteredinPhantom511  = 0;
+TH1F* hNotScatteredinPhantom511  = 0;
 
-int main(int argc, char *argv[])
+void createHistograms()
 {
-    if(argc != 3)
-    {
-        std::cerr<<"Invalid number of variables."<<std::endl;
+  hAllPrompt = new TH1F( "hAllPrompt", "All ", 1200, 0, 1200);
+  hScatteredinPhantomPrompt = new TH1F( "hScatteredinPhantomPrompt", "hScatteredinPhantomPrompt", 1200, 0, 1200);
+  hNotScatteredinPhantomPrompt = new TH1F( "hNotScatteredinPhantomPrompt", "hNotScatteredinPhantomPrompt", 1200, 0, 1200);
+
+  hAll511 = new TH1F( "hAll511", "All ", 1200, 0, 1200);
+  hScatteredinPhantom511 = new TH1F( "hScatteredinPhantom511", "hScatteredinPhantom511", 1200, 0, 1200);
+  hNotScatteredinPhantom511 = new TH1F( "hNotScatteredinPhantom511", "hNotScatteredinPhantom511", 1200, 0, 1200);
+}
+
+void fillHistograms(const FullEvent& event)
+{
+  bool isSmearingOn = false;  //change it to true to turn on the smearing
+  /// if for gamma energy is less than 0, that means that this this gamma was not registered at all in the scanner
+  double promptEnergy = event.gammaPrompt.Energy();
+  double gamma1Energy = event.gamma1.Energy();
+  double gamma2Energy = event.gamma2.Energy();
+
+  if (isSmearingOn) {
+    if (promptEnergy >= 0) {
+      promptEnergy = smearEnergy(promptEnergy);
     }
-    else
-    {
-        std::string file_name( argv[1] ); 
-	std::string emissionEnergy( argv[2] );			
+    if (gamma1Energy  >= 0) {
+      gamma1Energy = smearEnergy(gamma1Energy);
+    }
+    if (gamma2Energy  >= 0) {
+      gamma2Energy = smearEnergy(gamma2Energy);
+    }
+  }
 
-	AnalysisVariables av;
-	av.init();
+  if (promptEnergy > 0) {
+    hAllPrompt->Fill(promptEnergy);
+    if (event.gammaPromptScatteredInWater) {
+      hScatteredinPhantomPrompt->Fill(promptEnergy);
+    } else {
+      hNotScatteredinPhantomPrompt->Fill(promptEnergy);
+    }
+  }
 
-  //Histogramy bez rozmycia
-	TH1F h511( "h511", "h511", 200, 0, 1400 ); //Wszystkie zarajestrowane
-	TH1F hPrompt( "hPrompt", "hPrompt", 200, 0, 1400 );
-	//TH1F hGeoFromWater( "hGeoFromWater", "hGeoFromWater", 1000, 0, 400 ); //Wszystkie w fantomie
-  //Histogramy z rozmyciem
-	TH1F h5112("h5112", "h5112", 200, 0, 400); //Wszystkie zarajestrowane
-	TH1F hPrompt2("hPrompt2", "hPrompt2", 200, 0, 1400);
-	//TH1F hGeoFromWater2("hGeoFromWater2", "hGeoFromWater2", 1000, 0, 400); //Wszystkie w fantomie
-        TFile file("histos.root", "recreate");	
-        hPrompt.Write();
-        h511.Write();
-        file.Close();
+  if (gamma1Energy > 0) {
+    hAll511->Fill(gamma1Energy);
+    if (event.gamma1ScatteredInWater) {
+      hScatteredinPhantom511->Fill(gamma1Energy);
+    } else {
+      hNotScatteredinPhantom511->Fill(gamma1Energy);
+    }
+  }
+  if (gamma2Energy > 0) {
+    hAll511->Fill(gamma2Energy);
+    if (event.gamma2ScatteredInWater) {
+      hScatteredinPhantom511->Fill(gamma2Energy);
+    } else {
+      hNotScatteredinPhantom511->Fill(gamma2Energy);
+    }
+  }
 
 
-        try
-        {
-            GlobalActorReader gar;
-            if(gar.LoadFile(file_name))
-                while(gar.Read())
-		 Check(gar, av, h511, hPrompt, h5112, hPrompt2);
-            else
-                std::cerr<<"Loading file failed."<<std::endl;
-	   	Int_t n= 1500;
-	   	Double_t m1, m2, m3, m4;
-   		Double_t TPR[n], PPV[n], FPR[n], w[n];
-             for (Int_t i=0; i < n; i++) 
-      {                    
-            m4=hPrompt.Integral(i,n); //hSignal
-            TPR[i]=hPrompt.Integral(i,n)/hPrompt.Integral(0,n); //effi
-            PPV[i]=(m4)/(hPrompt.Integral(i,n)+h511.Integral(i,n));//purity
-            FPR[i]=(h511.Integral(n,i))/(h511.Integral(0,i));
-            // purity = 511 not scattered in phantom/all registered
-            // hSignal = hGeoAll2 -hWater2;  TP
-            // purity = hSignal(i,n)/hGeoAll2(i,n)
-            // hEff = hSignal(i,n)/hSignal(0,n)
+  ///To get hit position probably you need:
+  /// event.gamma1.Vect().X()
+  /// event.gamma1.Vect().Y()
+  /// event.gamma1.Vect().Z()
+  // Again check if energy>0 otherwise that means that gamma was not registered
+}
 
-            // One plot: hWater from smeared Energy 
+void saveHistograms()
+{
 
-            // 511 keV -not scattered in phantonm
-            // ~1100 keV not scattered in phantom
-            // background:
-            // 511 keV scattered in phantom
-            // ~1100 keV scattered in phanton
-            w[i]=i;
+  //histograms prompt
+  TCanvas c1("c", "c", 2000, 2000);
+  hAllPrompt->SetLineColor(kBlack);
+  hAllPrompt->Draw();
+  hScatteredinPhantomPrompt->SetLineColor(kRed);
+  hScatteredinPhantomPrompt->Draw("same");
+  hNotScatteredinPhantomPrompt->SetLineColor(kBlue);
+  hNotScatteredinPhantomPrompt->Draw("same");
+  c1.SaveAs("prompt.png");
+
+  //histograms 511
+  TCanvas c2("c", "c", 2000, 2000);
+  hAll511->SetLineColor(kBlack);
+  hAll511->Draw();
+  hScatteredinPhantom511->SetLineColor(kRed);
+  hScatteredinPhantom511->Draw("same");
+  hNotScatteredinPhantom511->SetLineColor(kBlue);
+  hNotScatteredinPhantom511->Draw("same");
+  c2.SaveAs("511.png");
+
+  TFile f("histograms_prompt.root", "recreate");
+  hAllPrompt->Write();
+  hScatteredinPhantomPrompt->SetLineColor(kRed);
+  hScatteredinPhantomPrompt->Write();
+  hNotScatteredinPhantomPrompt->SetLineColor(kBlue);
+  hNotScatteredinPhantomPrompt->Write();
+  f.Close();
+  TFile f2("histograms_511.root", "recreate");
+  hAll511->Write();
+  hScatteredinPhantom511->SetLineColor(kRed);
+  hScatteredinPhantom511->Write();
+  hNotScatteredinPhantom511->SetLineColor(kBlue);
+  hNotScatteredinPhantom511->Write();
+  f2.Close();
+}
+
+void clearHistograms()
+{
+  if (hAllPrompt) {
+    delete hAllPrompt;
+    hAllPrompt = 0;
+  }
+  if (hScatteredinPhantomPrompt ) {
+    delete hScatteredinPhantomPrompt ;
+    hScatteredinPhantomPrompt = 0;
+  }
+  if (hNotScatteredinPhantomPrompt ) {
+    delete hNotScatteredinPhantomPrompt ;
+    hNotScatteredinPhantomPrompt = 0;
+  }
+  if (hAll511) {
+    delete hAll511;
+    hAll511 = 0;
+  }
+  if (hScatteredinPhantom511 ) {
+    delete hScatteredinPhantom511 ;
+    hScatteredinPhantom511 = 0;
+  }
+  if (hNotScatteredinPhantom511 ) {
+    delete hNotScatteredinPhantom511 ;
+    hNotScatteredinPhantom511  = 0;
+  }
+}
+
+int main(int argc, char* argv[])
+{
+  if (argc != 4) {
+    std::cerr << "Invalid number of variables." << std::endl;
+  } else {
+    std::string file_name( argv[1] );
+    std::string water_volume_name( argv[2] );
+    std::string emissionEnergy(argv[3]);
+
+
+    FullEvent event;
+    bool isNewEvent = false;
+
+    createHistograms();
+    try {
+      GlobalActorReader gar;
+      if (gar.LoadFile(file_name)) {
+        while (gar.Read()) {
+          isNewEvent = readEvent(gar, water_volume_name, event);
+          if (isNewEvent) {
+            fillHistograms(event);
+            event.reset();
+          }
+        }
+      } else {
+        std::cerr << "Loading file failed." << std::endl;
       }
-	    
-		TGraph	TFF(n, w, TPR); //efficiency
-		TGraph	TFF2(n, TPR, FPR); //purity
-		TGraph	TFF3(n, w, PPV); //false alarm
+      saveHistograms();
 
-		//histogramy bez rozmycia
-    TCanvas c("c", "c", 1000, 1000);
-		h511.Draw("hist l");
-		//c.Print("hWater.png");
-		hPrompt.Draw("same");
-		//c.Print("hGeoAll.png");
-		//hGeoFromWater.Draw("same");
-		c.Print("bez_rozmycia_30.png");
+      //Int_t n = 1500, a = 0;
+      //Double_t m1, m2, m3, m4;
+      //Double_t TPR[n], PPV[n], FPR[n], w[n];
+      //for (Int_t i = 0; i < n; i++) {
+      //int wbini = hAllPrompt.GetXaxis()->FindBin(i);//zwraca numer binu dla ktrego energia jest i keV
+      //int wbinn = hAllPrompt.GetXaxis()->FindBin(n);
+      //int gini = hFantomPrompt.GetXaxis()->FindBin(i);
+      //int ginn = hAllPrompt.GetXaxis()->FindBin(n);
+      //int wbin0 = hFantomPrompt.GetXaxis()->FindBin(a);
+      //int gin0 = hFantomPrompt.GetXaxis()->FindBin(a);
+      //m4 = hAllPrompt.Integral(wbini, wbinn) - hFantomPrompt.Integral(gini, ginn); //hSignal
+      //TPR[i] = (m4) / (hAllPrompt.Integral(wbin0, wbinn) - hFantomPrompt.Integral(gin0, ginn)); //effi
+      //PPV[i] = (m4) / (hAllPrompt.Integral(wbini, wbinn)); //purity
+      //FPR[i] = (hFantomPrompt.Integral(gin0, gini)) / (hFantomPrompt.Integral(wbin0, wbini));
+      //w[i] = i;
+      //}
 
-    //histogramy z rozmyciem
-		TCanvas c1("c1");
-		h5112.Draw("hist l");
-		//c1.Print("hWater2.png");
-		//hGeoFromWater2.Draw("hist l");
-		hPrompt2.Draw("same");
-		//c1.Print("hGeoAll2.png");
-		//hGeoFromWater2.Draw("same");
-		c1.Print("z_rozmyciem_30.png");
-    
-    //purity i efficiency
-    TCanvas c2("c2","c2", 1000, 1000);
-    TFF.Draw();
-		//c2.Print("efficiency_20.png");
-		//TCanvas c4("c4");
-		//TFF.SetLineColor(kRed);
-		//TFF.Draw("same");
-		TLegend legend(0.1,0.1,0.1,0.1);
-   	//legend.SetHeader("The Legend Title","C"); // option "C" allows to center the header
-    legend.AddEntry("TFF","efficiency","l");
-   	legend.AddEntry("TFF3","purity (czerwony)","l");
-   	legend.Draw();
-		c2.Print("purity_and_efficiency_30.png");
+      //TGraph	TFF(n, w, TPR); //efficiency
+      //TGraph	TFF2(n, TPR, FPR); //purity
+      //TGraph	TFF3(n, w, PPV); //false alarm
 
-    //krzywa ROC
-		TCanvas c3("c3");
-		TFF2.Draw("AC+");
-		c3.Print("ROC.png");
-	    
 
-        }
+      //purity i efficiency
+      //TCanvas c2("c2");
+      //TFF.Draw();
+      ////c2.Print("efficiency_20.png");
+      ////TCanvas c4("c4");
+      //TFF3.SetLineColor(kRed);
+      //TFF3.Draw("same");
+      //TLegend legend(0.1, 0.1, 0.1, 0.1);
+      ////legend.SetHeader("The Legend Title","C"); // option "C" allows to center the header
+      //legend.AddEntry("TFF", "efficiency", "l");
+      //legend.AddEntry("TFF3", "purity (czerwony)", "same");
+      //legend.Draw();
+      //c2.Print("purity_and_efficiency_25.png");
 
-       // hWater.Write();
-        //myFile.Close();
-        catch(const std::logic_error& e )
-        {
-            std::cerr<<e.what()<<std::endl;
-        }
-        catch(...)
-        {
-            std::cerr<<"Udefined exception"<<std::endl;
-        }
+      ////krzywa ROC
+      //TCanvas c3("c3");
+      //TFF2.Draw("AC+");
+      //c3.Print("ROC_25.png");
+
+      clearHistograms();
+    } catch (const std::logic_error& e ) {
+      std::cerr << e.what() << std::endl;
+    } catch (...) {
+      std::cerr << "Udefined exception" << std::endl;
     }
-    return 0;
+  }
+  return 0;
 }
