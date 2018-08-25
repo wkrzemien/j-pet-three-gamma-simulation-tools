@@ -16,6 +16,7 @@
 
 using namespace std;
 
+
 struct FullEvent {
   FullEvent()
   {
@@ -72,50 +73,63 @@ distance= sqrt(pow((radius/2),2)-pow((x2-x1),2)-pow((y2-y1),2));
 return distance;
 }*/
 
-/// return true if full event has been read.
+/// returns pair<bool,FullEvent >  if true the return FullEvent can be saved
 /// Track1 ==> prompt
 /// Track2 ==> 511 keV
 /// Track3 ==> 511 keV
-bool readEvent(const GlobalActorReader& gar, FullEvent& outEvent)
+std::pair<bool, FullEvent> readEvent(const GlobalActorReader& gar, FullEvent& outEvent)
 {
   int trackID = gar.GetTrackID();
   //std::string volume_name = gar.GetVolumeName();
+  double energyBeforeProcess = gar.GetEnergyBeforeProcess();
   double energyDeposition = gar.GetEnergyLossDuringProcess();
   double emissionEnergy = gar.GetEmissionEnergyFromSource();
   auto hitPosition = gar.GetProcessPosition(); /// I am not sure here
 
   int currentEventID = gar.GetEventID();
   int previousEventID = outEvent.fEventID;
-  if ( previousEventID != currentEventID ) {
+  bool isNewEvent = false;
+  FullEvent lastEvent = outEvent;
+  if ( previousEventID == currentEventID ) {
+    isNewEvent = false;
+  } else {
     if ( previousEventID > -1 ) {
+      isNewEvent = true;
+      outEvent.reset();
       outEvent.fEventID = currentEventID; /// we save new eventID to outEvent
-      return true;
     } else {
+      isNewEvent = false;
       outEvent.fEventID = currentEventID; /// this is the first event starting
-      return false;
     }
   }
-
 /// if there is multiple scattering we save only the last part
   if (isEqual(emissionEnergy, 511) || isEqual(emissionEnergy, 1157)) {
     /// scatter in detector
     if (trackID == 1) {
       assert(!isEqual(emissionEnergy, 511));
       assert(isEqual(emissionEnergy, 1157));
-      outEvent.gammaPrompt = TLorentzVector(hitPosition, energyDeposition);
+      ///This means it is the first time in the detector
+      if (isEqual(energyBeforeProcess, 1157)) {
+        outEvent.gammaPrompt = TLorentzVector(hitPosition, energyDeposition);
+      }
+      /// else this means that prompt scatters for the second time in the detector
     }
     if (trackID == 2) {
       assert(isEqual(emissionEnergy, 511));
       assert(!isEqual(emissionEnergy, 1157));
-      outEvent.gamma1 = TLorentzVector(hitPosition, energyDeposition);
+      if (isEqual(energyBeforeProcess, 511)) {
+        outEvent.gamma1 = TLorentzVector(hitPosition, energyDeposition);
+      }
     }
     if (trackID == 3) {
       assert(isEqual(emissionEnergy, 511));
       assert(!isEqual(emissionEnergy, 1157));
-      outEvent.gamma2 = TLorentzVector(hitPosition, energyDeposition);
+      if (isEqual(energyBeforeProcess, 511)) {
+        outEvent.gamma2 = TLorentzVector(hitPosition, energyDeposition);
+      }
     }
   }
-  return false;
+  return std::make_pair(isNewEvent, lastEvent);
 }
 
 TH1F* hAllPrompt = 0;
@@ -133,6 +147,7 @@ TGraph* ROC_511 = 0;
 void createHistograms()
 {
   hAllPrompt = new TH1F( "hAllPrompt", "All ", 500, 0, 1200);
+  hAllPrompt->GetXaxis()->SetCanExtend(true);
   hAll511 = new TH1F( "hAll511", "All ", 500, 0, 1200);
   h3detPrompt = new TH1F( "h3detPrompt", "Prompt with 3 det", 500, 0, 1200);
   h2det1Prompt = new TH1F( "h2det1Prompt", "Prompt with det prompt and gamma1 ", 500, 0, 1200);
@@ -180,7 +195,7 @@ void fillHistograms(const FullEvent& event)
   }
 
 
-  if (promptEnergy > 0) {
+  if (promptEnergy >= 0) {
     hAllPrompt->Fill(promptEnergy);
   }
 
@@ -245,22 +260,22 @@ void drawPlot()
   const double kEnergyMax = 1158;
   const int kNumberOfSteps = 1158;
   const double kEnergyStep = (kEnergyMax - kEnergyMin) / kNumberOfSteps;
-  Double_t TPR_prompt[kNumberOfSteps]; 
+  Double_t TPR_prompt[kNumberOfSteps];
   Double_t PPV_prompt[kNumberOfSteps];
-  Double_t FPR_prompt[kNumberOfSteps]; 
-  Double_t TPR_511[kNumberOfSteps]; 
-  Double_t PPV_511[kNumberOfSteps]; 
-  Double_t FPR_511[kNumberOfSteps]; 
+  Double_t FPR_prompt[kNumberOfSteps];
+  Double_t TPR_511[kNumberOfSteps];
+  Double_t PPV_511[kNumberOfSteps];
+  Double_t FPR_511[kNumberOfSteps];
   Double_t energies[kNumberOfSteps];
 
 
   int pbin0 = hAllPrompt->GetXaxis()->FindBin(kEnergyMin); /// min bin for Promtp
   int pbinn = hAllPrompt->GetXaxis()->FindBin(kEnergyMax); /// max bin for Prompt
-  int bin0 = hAll511->GetXaxis()->FindBin(kEnergyMin); // min bin for 511 
+  int bin0 = hAll511->GetXaxis()->FindBin(kEnergyMin); // min bin for 511
   int binn = hAll511->GetXaxis()->FindBin(kEnergyMax); /// max bin for 511
   for (Int_t i = 0; i < kNumberOfSteps ; i++) {
     double currentEnergy =  kEnergyStep * i;
-    energies[i] = currentEnergy; 
+    energies[i] = currentEnergy;
 
     int bini = hAll511->GetXaxis()->FindBin(currentEnergy);
     int pbini = hAllPrompt->GetXaxis()->FindBin(currentEnergy);//zwraca numer binu dla ktrego energia jest i keV
@@ -397,17 +412,15 @@ int main(int argc, char* argv[])
 
 
     FullEvent event;
-    bool isNewEvent = false;
 
     createHistograms();
     try {
       GlobalActorReader gar;
       if (gar.LoadFile(file_name)) {
         while (gar.Read()) {
-          isNewEvent = readEvent(gar, event);
-          if (isNewEvent) {
-            fillHistograms(event);
-            event.reset();
+          auto res = readEvent(gar, event);
+          if (res.first) {
+            fillHistograms(res.second);
           }
         }
       } else {
