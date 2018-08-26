@@ -102,13 +102,14 @@ std::pair<bool, FullEvent> readEvent(const GlobalActorReader& gar, FullEvent& ou
       outEvent.fEventID = currentEventID; /// this is the first event starting
     }
   }
-/// if there is multiple scattering we save only the last part
+/// we save only the first scattering!!!
   if (isEqual(emissionEnergy, 511) || isEqual(emissionEnergy, 1157)) {
     /// scatter in detector
     if (trackID == 1) {
       assert(!isEqual(emissionEnergy, 511));
       assert(isEqual(emissionEnergy, 1157));
       ///This means it is the first time in the detector
+      /// This condition will not work with in-phantom scattering!!!
       if (isEqual(energyBeforeProcess, 1157)) {
         outEvent.gammaPrompt = TLorentzVector(hitPosition, energyDeposition);
       }
@@ -117,6 +118,7 @@ std::pair<bool, FullEvent> readEvent(const GlobalActorReader& gar, FullEvent& ou
     if (trackID == 2) {
       assert(isEqual(emissionEnergy, 511));
       assert(!isEqual(emissionEnergy, 1157));
+      /// This condition will not work with in-phantom scattering!!!
       if (isEqual(energyBeforeProcess, 511)) {
         outEvent.gamma1 = TLorentzVector(hitPosition, energyDeposition);
       }
@@ -124,6 +126,7 @@ std::pair<bool, FullEvent> readEvent(const GlobalActorReader& gar, FullEvent& ou
     if (trackID == 3) {
       assert(isEqual(emissionEnergy, 511));
       assert(!isEqual(emissionEnergy, 1157));
+      /// This condition will not work with in-phantom scattering!!!
       if (isEqual(energyBeforeProcess, 511)) {
         outEvent.gamma2 = TLorentzVector(hitPosition, energyDeposition);
       }
