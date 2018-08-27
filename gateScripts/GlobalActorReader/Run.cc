@@ -16,6 +16,8 @@
 
 using namespace std;
 
+int gAllPrompt = 0;
+int gAll511 = 0;
 
 struct FullEvent {
   FullEvent()
@@ -140,6 +142,9 @@ TH1F* hAll511 = 0;
 TH1F* h3detPrompt = 0;
 TH1F* h2det1Prompt = 0;
 TH1F* h2det2Prompt = 0;
+TH1F* hPromptMult = 0;
+TH1F* h511Mult = 0;
+
 TGraph* purity_prompt = 0;
 TGraph* efficiency_prompt = 0;
 TGraph* ROC_prompt = 0;
@@ -155,6 +160,8 @@ void createHistograms()
   h3detPrompt = new TH1F( "h3detPrompt", "Prompt with 3 det", 500, 0, 1200);
   h2det1Prompt = new TH1F( "h2det1Prompt", "Prompt with det prompt and gamma1 ", 500, 0, 1200);
   h2det2Prompt = new TH1F( "h2det2Prompt", "Prompt with det prompt and gamma2  ", 500, 0, 1200);
+  hPromptMult = new TH1F("hPromptMult","Prompt multiplicity", 2, -0.5, 1.5); 
+  h511Mult = new TH1F("h511Mult","511 gamma multiplicity", 3, -0.5, 2.5);
 
 }
 
@@ -200,13 +207,19 @@ void fillHistograms(const FullEvent& event)
 
   if (promptEnergy >= 0) {
     hAllPrompt->Fill(promptEnergy);
+    hPromptMult->Fill(1);
+    gAllPrompt++;
+  } else{
+    hPromptMult->Fill(0);
   }
 
   if (gamma1Energy > 0) {
     hAll511->Fill(gamma1Energy);
+    gAll511++;
   }
   if (gamma2Energy > 0) {
     hAll511->Fill(gamma2Energy);
+    gAll511++;
   }
 
   if (promptEnergy > 0 && gamma1Energy > 0 && gamma2Energy > 0) {
@@ -214,9 +227,19 @@ void fillHistograms(const FullEvent& event)
   }
   if (promptEnergy > 0 && gamma1Energy > 0) {
     h2det1Prompt->Fill(promptEnergy);
+    h511Mult->Fill(2);  
   }
   if (promptEnergy > 0 && gamma2Energy > 0) {
     h2det2Prompt->Fill(promptEnergy);
+  }
+  
+  //only 1 511 detected
+  if((gamma1Energy >=0 && gamma2Energy < 0) ||(gamma1Energy < 0 && gamma2Energy >= 0)){
+    h511Mult->Fill(1);  
+  }
+  //no 511 gammas detected
+  if(gamma1Energy < 0 && gamma2Energy < 0){
+    h511Mult->Fill(0);  
   }
 
   //new TH1F if(promptEnergy>100&&gamma1Energy>100&&gamma2Energy>100)
@@ -272,31 +295,53 @@ void drawPlot()
   Double_t energies[kNumberOfSteps];
 
 
-  int pbin0 = hAllPrompt->GetXaxis()->FindBin(kEnergyMin); /// min bin for Promtp
-  int pbinn = hAllPrompt->GetXaxis()->FindBin(kEnergyMax); /// max bin for Prompt
-  int bin0 = hAll511->GetXaxis()->FindBin(kEnergyMin); // min bin for 511
-  int binn = hAll511->GetXaxis()->FindBin(kEnergyMax); /// max bin for 511
+  int minBinPrompt = hAllPrompt->GetXaxis()->FindBin(kEnergyMin); /// min bin for Promtp
+  int maxBinPrompt = hAllPrompt->GetXaxis()->FindBin(kEnergyMax); /// max bin for Prompt
+  int minBin511 = hAll511->GetXaxis()->FindBin(kEnergyMin); // min bin for 511
+  int maxBin511 = hAll511->GetXaxis()->FindBin(kEnergyMax); /// max bin for 511
+
+  double allPrompt = hAllPrompt->Integral(minBinPrompt, maxBinPrompt);
+  double all511 = hAll511->Integral(minBin511, maxBin511);
+
   for (Int_t i = 0; i < kNumberOfSteps ; i++) {
     double currentEnergy =  kEnergyStep * i;
     energies[i] = currentEnergy;
 
-    int bini = hAll511->GetXaxis()->FindBin(currentEnergy);
-    int pbini = hAllPrompt->GetXaxis()->FindBin(currentEnergy);//zwraca numer binu dla ktrego energia jest i keV
+    int currentBin511 = hAll511->GetXaxis()->FindBin(currentEnergy);
+    int currentBinPrompt = hAllPrompt->GetXaxis()->FindBin(currentEnergy);
 
-    PPV_prompt[i] = hAllPrompt->Integral(pbini, pbinn) / (hAllPrompt->Integral(pbini, pbinn) + hAll511->Integral(bini, binn)); //purity
-    TPR_prompt[i] = hAllPrompt->Integral(pbini, pbinn) / hAllPrompt->Integral(pbin0, pbinn); //effi
-    FPR_prompt[i] = (hAll511->Integral(bin0, bini)) / (hAll511->Integral(bin0, binn));
+    double allAcceptedAsPrompt = hAllPrompt->Integral(currentBinPrompt, maxBinPrompt) + hAll511->Integral(currentBin511, maxBin511);
+    double promptAcceptedAsPrompt = hAllPrompt->Integral(currentBinPrompt, maxBinPrompt);
+    double v511AcceptedAsPrompt = hAll511->Integral(currentBin511, maxBin511);
 
-    PPV_511[i] = hAll511->Integral(pbin0, pbini) / (hAllPrompt->Integral(pbin0, pbini) + hAll511->Integral(bin0, bini)); //purity
-    TPR_511[i] = hAll511->Integral(pbin0, pbini) / hAll511->Integral(pbin0, pbinn); //effi
-    FPR_511[i] = (hAllPrompt->Integral(bin0, bini)) / (hAllPrompt->Integral(bin0, binn));
+    if (allAcceptedAsPrompt !=0) {
+      PPV_prompt[i] = promptAcceptedAsPrompt/allAcceptedAsPrompt; //purity
+    } else {
+      PPV_prompt[i] = 0;
+    }
+    TPR_prompt[i] = promptAcceptedAsPrompt/allPrompt; //effi
+    /// This is the porcentage of 511 that is classifed falsely as prompt
+    FPR_prompt[i] = v511AcceptedAsPrompt / all511;
+
+    double allAcceptedAs511 = (hAllPrompt->Integral(minBinPrompt, currentBinPrompt) + hAll511->Integral(minBin511, currentBin511));
+    double v511AcceptedAs511 = hAll511->Integral(minBin511, currentBin511);
+    double promptAcceptedAs511 = hAllPrompt->Integral(minBinPrompt, currentBinPrompt);
+
+    if (allAcceptedAs511 !=0) {
+      PPV_511[i] = v511AcceptedAs511 /allAcceptedAs511; //purity
+    } else {
+      PPV_511[i] = 0;
+    }
+    TPR_511[i] = v511AcceptedAs511 / all511; //effi
+    /// This is the porcentage of prompt that is classifed falsely as 511
+    FPR_511[i] = promptAcceptedAs511  / allPrompt;
   }
 
-  ROC_prompt = new TGraph(kNumberOfSteps, TPR_prompt, FPR_prompt);
+  ROC_prompt = new TGraph(kNumberOfSteps, FPR_prompt, TPR_prompt);
   efficiency_prompt = new TGraph(kNumberOfSteps, energies, TPR_prompt);
   purity_prompt = new TGraph(kNumberOfSteps, energies, PPV_prompt);
 
-  ROC_511 = new TGraph(kNumberOfSteps, TPR_511, FPR_511);
+  ROC_511 = new TGraph(kNumberOfSteps, FPR_511, TPR_511);
   efficiency_511 = new TGraph(kNumberOfSteps, energies, TPR_511);
   purity_511 = new TGraph(kNumberOfSteps, energies, PPV_511);
 }
@@ -306,7 +351,7 @@ void savePlot()
   TCanvas c2("c", "c", 2000, 2000);
   purity_prompt->SetLineColor(kBlack);
   purity_prompt->SetTitle("purity prompt");
-  purity_prompt->GetXaxis()->SetTitle("n");
+  purity_prompt->GetXaxis()->SetTitle("Energy cut [MeV]");
   purity_prompt->GetYaxis()->SetTitle("PPV");
   purity_prompt->Draw();
   c2.SaveAs("purity_prompt.png");
@@ -314,7 +359,7 @@ void savePlot()
   TCanvas c3("c", "c", 2000, 2000);
   purity_511->SetLineColor(kBlack);
   purity_511->SetTitle("purity 511");
-  purity_511->GetXaxis()->SetTitle("n");
+  purity_511->GetXaxis()->SetTitle("Energy cut [MeV]");
   purity_511->GetYaxis()->SetTitle("PPV");
   purity_511->Draw();
   c3.SaveAs("purity_511.png");
@@ -322,7 +367,7 @@ void savePlot()
   TCanvas c4("c", "c", 2000, 2000);
   efficiency_511->SetLineColor(kRed);
   efficiency_511->SetTitle("efficiency 511");
-  efficiency_511->GetXaxis()->SetTitle("n");
+  efficiency_511->GetXaxis()->SetTitle("Energy cut [MeV]");
   efficiency_511->GetYaxis()->SetTitle("TPR");
   efficiency_511->Draw();
   c4.SaveAs("efficiency_511.png");
@@ -330,7 +375,7 @@ void savePlot()
   TCanvas c5("c", "c", 2000, 2000);
   efficiency_prompt->SetLineColor(kRed);
   efficiency_prompt->SetTitle("efficiency prompt");
-  efficiency_prompt->GetXaxis()->SetTitle("n");
+  efficiency_prompt->GetXaxis()->SetTitle("Energy cut [MeV]");
   efficiency_prompt->GetYaxis()->SetTitle("TPR");
   efficiency_prompt->Draw();
   c5.SaveAs("efficiency_prompt.png");
@@ -338,16 +383,16 @@ void savePlot()
   TCanvas c6("c", "c", 2000, 2000);
   ROC_prompt->SetLineColor(kBlack);
   ROC_prompt->SetTitle("ROC prompt");
-  ROC_prompt->GetXaxis()->SetTitle("TPR");
-  ROC_prompt->GetYaxis()->SetTitle("FPR");
+  ROC_prompt->GetXaxis()->SetTitle("FPR");
+  ROC_prompt->GetYaxis()->SetTitle("TPR");
   ROC_prompt->Draw();
   c6.SaveAs("ROc_prompt.png");
 
   TCanvas c7("c", "c", 2000, 2000);
   ROC_511->SetLineColor(kBlack);
   ROC_511->SetTitle("ROC 511");
-  ROC_511->GetXaxis()->SetTitle("TPR");
-  ROC_511->GetYaxis()->SetTitle("FPR");
+  ROC_511->GetXaxis()->SetTitle("FPR");
+  ROC_511->GetYaxis()->SetTitle("TPR");
   ROC_511->Draw();
   c7.SaveAs("ROc_511.png");
 
@@ -358,6 +403,8 @@ void savePlot()
   efficiency_prompt->Write();
   purity_prompt->Write();
   ROC_prompt->Write();
+  hPromptMult->Write();
+  h511Mult->Write();
   f.Close();
 }
 
@@ -413,7 +460,6 @@ int main(int argc, char* argv[])
     std::string file_name( argv[1] );
     std::string emissionEnergy(argv[2]);
 
-
     FullEvent event;
 
     createHistograms();
@@ -433,6 +479,14 @@ int main(int argc, char* argv[])
       saveHistograms();
       savePlot();
       clearHistograms();
+      
+      //calculating efficiencies of registration 
+      const double  kNumberOfGeneratedEvents = 5e6;
+      double PromptEff = (double)gAllPrompt/kNumberOfGeneratedEvents;
+      double Eff511 = (double)gAll511/(2*kNumberOfGeneratedEvents);
+      std::cout << "Efficiencies: " << std::endl;
+      std::cout << "GammaPrompt[%]  " << 100.*PromptEff <<std::endl;
+      std::cout << "Gamma 511[%] " << 100.*Eff511 <<std::endl;
     } catch (const std::logic_error& e ) {
       std::cerr << e.what() << std::endl;
     } catch (...) {
