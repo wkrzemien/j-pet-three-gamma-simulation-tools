@@ -1,22 +1,22 @@
 cmake_minimum_required(VERSION 2.6)
 
 #MANDATORY: Before first cmake please insert here your path to ROOT installation directory
-set(ROOT_INSTALLATION_DIRECTORY "/home/letishion/programs/root6")
+#set(ROOT_INSTALLATION_DIRECTORY "/home/letishion/programs/root6")
 
 ################################################################################
 # Handling of thisroot.sh
 ################################################################################
 
-message(STATUS "Your ROOT installation directory is: ${ROOT_INSTALLATION_DIRECTORY}")
+#message(STATUS "Your ROOT installation directory is: ${ROOT_INSTALLATION_DIRECTORY}")
 
-if(EXISTS ${ROOT_INSTALLATION_DIRECTORY}/bin/thisroot.sh)
-  message(STATUS "Status of thisroot.sh file : EXIST")
-else()
- message(FATAL_ERROR "Status of thisroot.sh file :  DOES NOT EXIST - is your path to ROOT installation directory is correct? Please check a variable ROOT_INSTALLATION_DIRECTORY in this CMakeList.txt file.")
-endif()
+#if(EXISTS ${ROOT_INSTALLATION_DIRECTORY}/bin/thisroot.sh)
+  #message(STATUS "Status of thisroot.sh file : EXIST")
+#else()
+ #message(FATAL_ERROR "Status of thisroot.sh file :  DOES NOT EXIST - is your path to ROOT installation directory is correct? Please check a variable ROOT_INSTALLATION_DIRECTORY in this CMakeList.txt file.")
+#endif()
 
-message(STATUS "Calling thisroot.sh")
-execute_process(COMMAND source ${ROOT_INSTALLATION_DIRECTORY}/bin/thisroot.sh)
+#message(STATUS "Calling thisroot.sh")
+#execute_process(COMMAND source ${ROOT_INSTALLATION_DIRECTORY}/bin/thisroot.sh)
 
 ################################################################################
 # Project configuration
@@ -27,7 +27,7 @@ set(projectBinary ${projectName}.x)
 
 project(${projectName} CXX) # using only C++
 
-add_definitions(-std=c++11) # using C++11 standard
+add_definitions(-std=c++11 -Wall) # using C++11 standard
 
 ################################################################################
 # Handling of ROOT 
@@ -62,6 +62,13 @@ endif()
 ################################################################################
 # Sources and linking 
 ################################################################################
+
+
+ROOT_GENERATE_DICTIONARY(Dict Event.hh LINKDEF EventLinkDef.h )
+#---Create a shared library with geneated dictionary
+add_library(Event SHARED Event.cc Dict.cc)
+target_link_libraries(Event ${ROOT_LIBRARIES} Event_cc_ACLiC_dict_rdict.pcm)
+
 
 file(GLOB HEADERS *.hh)
 file(GLOB SOURCES *.cc)

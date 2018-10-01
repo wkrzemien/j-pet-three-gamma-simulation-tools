@@ -1,3 +1,4 @@
+//R__LOAD_LIBRARY(Event_h.so)
 #include <iostream>
 #include "GlobalActorReader.hh"
 #include <stdexcept>
@@ -13,8 +14,10 @@
 #include <cmath>
 #include <TLorentzVector.h>
 #include <cassert>
-
+#include "Event.hh"
 using namespace std;
+
+
 
 int gAllPrompt = 0;
 int gAll511 = 0;
@@ -74,6 +77,64 @@ double distance =0;
 distance= sqrt(pow((radius/2),2)-pow((x2-x1),2)-pow((y2-y1),2));
 return distance;
 }*/
+
+//std::pair<bool, Event*> readEvent(const GlobalActorReader& gar, Event* outEvent)
+//{
+  //int trackID = gar.GetTrackID();
+  ////std::string volume_name = gar.GetVolumeName();
+  //double energyBeforeProcess = gar.GetEnergyBeforeProcess();
+  //double energyDeposition = gar.GetEnergyLossDuringProcess();
+  //double emissionEnergy = gar.GetEmissionEnergyFromSource();
+  //auto hitPosition = gar.GetProcessPosition(); /// I am not sure here
+
+  //int currentEventID = gar.GetEventID();
+  //int previousEventID = outEvent->fEventID;
+  //bool isNewEvent = false;
+  //FullEvent lastEvent = outEvent
+  //if ( previousEventID == currentEventID ) {
+    //isNewEvent = false;
+  //} else {
+    //if ( previousEventID > -1 ) {
+      //isNewEvent = true;
+      //outEvent->reset();
+      //outEvent->fEventID = currentEventID; /// we save new eventID to outEvent
+    //} else {
+      //isNewEvent = false;
+      //outEvent->fEventID = currentEventID; /// this is the first event starting
+    //}
+  //}
+///// we save only the first scattering!!!
+  //if (isEqual(emissionEnergy, 511) || isEqual(emissionEnergy, 1157)) {
+    ///// scatter in detector
+    //if (trackID == 1) {
+      //assert(!isEqual(emissionEnergy, 511));
+      //assert(isEqual(emissionEnergy, 1157));
+      /////This means it is the first time in the detector
+      ///// This condition will not work with in-phantom scattering!!!
+      //if (isEqual(energyBeforeProcess, 1157)) {
+        //outEvent->gammaPrompt = TLorentzVector(hitPosition, energyDeposition);
+      //}
+      ///// else this means that prompt scatters for the second time in the detector
+    //}
+    //if (trackID == 2) {
+      //assert(isEqual(emissionEnergy, 511));
+      //assert(!isEqual(emissionEnergy, 1157));
+      ///// This condition will not work with in-phantom scattering!!!
+      //if (isEqual(energyBeforeProcess, 511)) {
+        //outEvent->gamma1 = TLorentzVector(hitPosition, energyDeposition);
+      //}
+    //}
+    //if (trackID == 3) {
+      //assert(isEqual(emissionEnergy, 511));
+      //assert(!isEqual(emissionEnergy, 1157));
+      ///// This condition will not work with in-phantom scattering!!!
+      //if (isEqual(energyBeforeProcess, 511)) {
+        //outEvent->gamma2 = TLorentzVector(hitPosition, energyDeposition);
+      //}
+    //}
+  //}
+  //return std::make_pair(isNewEvent, lastEvent);
+//}
 
 /// returns pair<bool,FullEvent >  if true the return FullEvent can be saved
 /// Track1 ==> prompt
@@ -462,36 +523,60 @@ int main(int argc, char* argv[])
 
     FullEvent event;
 
-    createHistograms();
+    //createHistograms();
+    TFile file("test.root", "RECREATE");
+    TTree *tree = new TTree("tree","tree");
+    Event *e = new Event;
+    tree->Branch("event",&e, 16000,99);
+
     try {
       GlobalActorReader gar;
       if (gar.LoadFile(file_name)) {
+        int count = 0;
         while (gar.Read()) {
-          auto res = readEvent(gar, event);
-          if (res.first) {
-            fillHistograms(res.second);
-          }
+          //auto res = readEvent(gar, event);
+          //if (res.first) {
+            //fillHistograms(res.second);
+          //}
+          //auto res = readEvent(gar, e);
+          //if (res.first) {
+          TrackInteraction trackInt;
+          trackInt.fLocalTime = count *1000;
+          Track track;
+          track.fTrackInteractions.push_back(trackInt);
+          e->fEventID = gar.GetEventID();
+          e->fTracks.push_back(track);
+          tree->Fill();
+          count++;
+          //std::cout << "test:"<< count << std::endl;
+          //}
         }
       } else {
         std::cerr << "Loading file failed." << std::endl;
       }
-      drawPlot();
-      saveHistograms();
-      savePlot();
-      clearHistograms();
+
+      //drawPlot();
+      //saveHistograms();
+      //savePlot();
+      //clearHistograms();
       
       //calculating efficiencies of registration 
-      const double  kNumberOfGeneratedEvents = 5e6;
-      double PromptEff = (double)gAllPrompt/kNumberOfGeneratedEvents;
-      double Eff511 = (double)gAll511/(2*kNumberOfGeneratedEvents);
-      std::cout << "Efficiencies: " << std::endl;
-      std::cout << "GammaPrompt[%]  " << 100.*PromptEff <<std::endl;
-      std::cout << "Gamma 511[%] " << 100.*Eff511 <<std::endl;
+      //const double  kNumberOfGeneratedEvents = 5e6;
+      //double PromptEff = (double)gAllPrompt/kNumberOfGeneratedEvents;
+      //double Eff511 = (double)gAll511/(2*kNumberOfGeneratedEvents);
+      //std::cout << "Efficiencies: " << std::endl;
+      //std::cout << "GammaPrompt[%]  " << 100.*PromptEff <<std::endl;
+      //std::cout << "Gamma 511[%] " << 100.*Eff511 <<std::endl;
+
     } catch (const std::logic_error& e ) {
       std::cerr << e.what() << std::endl;
     } catch (...) {
       std::cerr << "Udefined exception" << std::endl;
     }
+    
+    file.cd();
+    assert(tree);
+    file.Write();
   }
   return 0;
 }
