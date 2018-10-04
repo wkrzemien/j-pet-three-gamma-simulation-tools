@@ -14,7 +14,7 @@
 #include <cmath>
 #include <TLorentzVector.h>
 #include <cassert>
-#include "Event.hh"
+#include "Event.h"
 using namespace std;
 
 

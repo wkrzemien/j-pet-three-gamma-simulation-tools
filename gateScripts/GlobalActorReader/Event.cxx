@@ -13,7 +13,7 @@
  *  @file Event.cc
  */
 
-#include "./Event.hh"
+#include "./Event.h"
 ClassImp(Event);
 ClassImp(Track);
 ClassImp(TrackInteraction);

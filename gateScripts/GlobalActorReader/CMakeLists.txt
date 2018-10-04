@@ -62,17 +62,17 @@ endif()
 ################################################################################
 # Sources and linking 
 ################################################################################
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)  #to change the LD_LIBRARY_PATH and accept pcm
 
-
-ROOT_GENERATE_DICTIONARY(Dict Event.hh LINKDEF EventLinkDef.h )
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+ROOT_GENERATE_DICTIONARY(EventDict Event.h LINKDEF EventLinkDef.h)
 #---Create a shared library with geneated dictionary
-add_library(Event SHARED Event.cc Dict.cc)
-target_link_libraries(Event ${ROOT_LIBRARIES} Event_cc_ACLiC_dict_rdict.pcm)
+add_library(Event SHARED Event.cxx EventDict.cxx)
+target_link_libraries(Event ${ROOT_LIBRARIES})
 
 
 file(GLOB HEADERS *.hh)
 file(GLOB SOURCES *.cc)
 
-add_executable(GAR ${SOURCES})
-
-target_link_libraries(GAR ${ROOT_LIBRARIES})
+add_executable(GAR ${SOURCES} Event.cxx)
+target_link_libraries(GAR ${ROOT_LIBRARIES} Event)
