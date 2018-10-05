@@ -43,7 +43,7 @@ endif()
 execute_process(COMMAND root-config --etcdir OUTPUT_VARIABLE ROOT_ETCDIR OUTPUT_STRIP_TRAILING_WHITESPACE)
 list(APPEND CMAKE_MODULE_PATH ${ROOT_ETCDIR}/cmake)
 
-find_package(ROOT QUIET)
+find_package(ROOT QUIET COMPONENTS TreePlayer)
 
 if(ROOT_FOUND)
   message(STATUS "Found ROOT version: ${ROOT_VERSION} (${ROOT_CONFIG_EXECUTABLE})")
