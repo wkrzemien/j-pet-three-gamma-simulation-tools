@@ -105,6 +105,53 @@ void simpleExampleHowToWorkWithEventTree(const std::string &inFile) {
   testOut.Close();
 }
 
+bool isScatteringInPhantom(const TrackInteraction& step) {
+  return step.fVolumeName == "detector1";
+}
+
+void simpleExampleHowToWorkWithEventTree2(const std::string &inFile) {
+
+  TFile testOut("testOutSimple.root", "RECREATE");
+  TH1F h("h", "h", 500, 0, 1200);
+  TFile file(inFile.c_str(), "READ");
+  TTreeReader reader("Tree", &file);
+  TTreeReaderValue<Event> event(reader, "Event");
+  /// Let's assume I want to plot the deposited energy 
+  /// photons which are scattered in phantom 
+  /// and  then in detector. 
+  double cut = 200;
+  while (reader.Next()) {
+    for (const auto &track : event->fTracks) {
+
+      bool wasInPhantom = false;
+      bool isInPhantom = false;
+      bool isInDetector = false;
+
+      auto &steps = track.fTrackInteractions;
+        int counterAboveCut = 0;
+        for (auto i = 0u; i < steps.size(); i++) {
+          auto &step = steps[i];
+          isInPhantom = isScatteringInPhantom(step);
+          isInDetector = !isInPhantom;
+          if(isInDetector) {
+            if(wasInPhantom) {
+            h.Fill(step.fEnergyDeposition);
+          } else {
+            ///second histogram 
+            }
+          }
+
+          if (isInPhantom) {
+            wasInPhantom =  true;
+          }
+      }
+    }
+  }
+  testOut.cd();
+  h.Write();
+  testOut.Close();
+}
+
 void hardcoreExampleHowToWorkWithEventTree(const std::string &inFile) {
 
   auto exactlyOneHit = [](const Track &track) -> bool {
@@ -199,8 +246,9 @@ int main(int argc, char *argv[]) {
     std::string in_file_name(argv[1]);
     std::string out_file_name(argv[2]);
     transformToEventTree(in_file_name, out_file_name);
-    hardcoreExampleHowToWorkWithEventTree(out_file_name);
+    //hardcoreExampleHowToWorkWithEventTree(out_file_name);
     simpleExampleHowToWorkWithEventTree(out_file_name);
+    //simpleExampleHowToWorkWithEventTree2(out_file_name);
   }
   return 0;
 }
