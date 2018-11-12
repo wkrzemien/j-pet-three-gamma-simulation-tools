@@ -109,6 +109,10 @@ bool isScatteringInPhantom(const TrackInteraction& step) {
   return step.fVolumeName == "detector1";
 }
 
+bool isScattering511(const TrackInteraction &hit) {
+    return (hit.fEnergyBeforeProcess == 511);
+};
+
 void simpleExampleHowToWorkWithEventTree2(const std::string &inFile) {
 
   TFile testOut("testOutSimple.root", "RECREATE");
@@ -116,9 +120,6 @@ void simpleExampleHowToWorkWithEventTree2(const std::string &inFile) {
   TFile file(inFile.c_str(), "READ");
   TTreeReader reader("Tree", &file);
   TTreeReaderValue<Event> event(reader, "Event");
-  /// Let's assume I want to plot the deposited energy 
-  /// photons which are scattered in phantom 
-  /// and  then in detector. 
   double cut = 200;
   while (reader.Next()) {
     for (const auto &track : event->fTracks) {
@@ -126,24 +127,29 @@ void simpleExampleHowToWorkWithEventTree2(const std::string &inFile) {
       bool wasInPhantom = false;
       bool isInPhantom = false;
       bool isInDetector = false;
+      bool is511 = false;
 
       auto &steps = track.fTrackInteractions;
-        int counterAboveCut = 0;
-        for (auto i = 0u; i < steps.size(); i++) {
-          auto &step = steps[i];
-          isInPhantom = isScatteringInPhantom(step);
-          isInDetector = !isInPhantom;
-          if(isInDetector) {
-            if(wasInPhantom) {
-            h.Fill(step.fEnergyDeposition);
-          } else {
-            ///second histogram 
-            }
+      int counterAboveCut = 0;
+      for (auto i = 0u; i < steps.size(); i++) {
+        auto &hit = steps[i];
+        is511 =isScattering511(hit);
+        isInPhantom = isScatteringInPhantom(hit);
+        isInDetector = !isInPhantom;
+        if(is511){
+          std::cout << "It is 511! " << std::endl;
+        }
+        if(isInDetector) {
+          if(wasInPhantom) {
+          h.Fill(hit.fEnergyDeposition);
+        } else {
+          ///second histogram 
           }
+        }
 
-          if (isInPhantom) {
-            wasInPhantom =  true;
-          }
+        if (isInPhantom) {
+          wasInPhantom =  true;
+        }
       }
     }
   }
