@@ -1,3 +1,4 @@
+
 //R__LOAD_LIBRARY(Event_h.so)
 #include "TCanvas.h"
 #include "TH1F.h"
@@ -105,56 +106,160 @@ void simpleExampleHowToWorkWithEventTree(const std::string &inFile) {
   testOut.Close();
 }
 
-bool isScatteringInPhantom(const TrackInteraction& step) {
-  return step.fVolumeName == "detector1";
+
+random_device rd;
+mt19937 gen(rd());
+
+Double_t sigmaE(Double_t E, Double_t coeff = 0.0444)
+{
+  return coeff / TMath::Sqrt(E) * E;
 }
 
-bool isScattering511(const TrackInteraction &hit) {
-    return (hit.fEnergyBeforeProcess == 511);
-};
+double r_norm(double mean, double sigmaE)
+{
+  normal_distribution<double> d(mean, sigmaE);
+  return d(gen);
+}
+
+bool isEqual(double x, double y, double epsilon = 10e-9)
+{
+  return std::abs(x - y) < epsilon;
+}
+
+
+double smearEnergy(double energy)
+{
+  int r=0;
+  return r_norm(energy, 1000. * sigmaE((energy) * 1. / 1000.));
+}
+
+double calculateDistance(double x1, double y1, double x2, double y2)
+{
+double distance =0;
+distance= abs(x2*y1-y2*x1)/sqrt(pow((y2-y1),2)+pow((x2-x1),2));
+return distance;
+}
+
+  auto exactlyOneHit = [](const Track &track) -> bool {
+    return (track.fTrackInteractions.size() == 1);
+  };
+
+ auto exactlyTwoHitsInEvent = [&exactlyOneHit](const Event &event) -> bool {
+    return (event.fTracks.size() == 2) &&
+           std::all_of(event.fTracks.begin(), event.fTracks.end(),
+                       exactlyOneHit);
+  };
+
+   auto exactlyThreeHitsInEvent = [&exactlyOneHit](const Event &event) -> bool {
+    return (event.fTracks.size() == 3) &&
+           std::all_of(event.fTracks.begin(), event.fTracks.end(),
+                       exactlyOneHit);
+  };
+    TGraph* gamma1gamma2_wykres = 0;
 
 void simpleExampleHowToWorkWithEventTree2(const std::string &inFile) {
 
   TFile testOut("testOutSimple.root", "RECREATE");
-  TH1F h("h", "h", 500, 0, 1200);
+  TH1F hgamma1X("hgamma1X", "h1X", 500, -1200, 1200);
+  TH1F hgamma2X("hgamma2X", "hgamma2X", 500, -1200, 1200);
+  TH1F hpromptX("hpromptX", "hpromptX", 500, -1200, 1200);
+  TH1F hgamma1Y("hgamma1Y", "hgamma1Y", 500, -1200, 1200);
+  TH1F hgamma1Z("hgamma1Z", "hgamma1Z", 500, -1200, 1200);
+  TH1F hpromptY("hpromptY", "hpromptY", 500, -1200, 1200);
+  TH1F hpromptZ("hpromptZ", "hpromptZ", 500, -1200, 1200);
+  TH1F hgamma2Y("hgamma2Y", "hgamma2Y", 500, -1200, 1200);
+  TH1F hgamma2Z("hgamma2Z", "hgamma2Z", 500, -1200, 1200);
+  TH1F hgamma1prompt("hgamma1prompt", "hpromptZ", 500, -1200, 1200);
+  TH1F hgamma2prompt("hgamma2prompt", "hgamma2Y", 500, -1200, 1200);
+  TH1F hgamma1gamma2("hgamma1gamma2", "hgamma2Z", 500, -1200, 1200);
+
+
+  TLorentzVector gammaPrompt;
+  TLorentzVector gamma1;
+  TLorentzVector gamma2;
   TFile file(inFile.c_str(), "READ");
   TTreeReader reader("Tree", &file);
   TTreeReaderValue<Event> event(reader, "Event");
   double cut = 200;
+  
+  std::vector <TLorentzVector> gammaPromptPos;
+  std::vector <TLorentzVector> gamma511Pos1;
+  std::vector <TLorentzVector> gamma511Pos2;
+  assert(isEqual(calculateDistance(1, sqrt(3),1,-sqrt(3)),1));  
   while (reader.Next()) {
-    for (const auto &track : event->fTracks) {
+      for (const auto &track : event->fTracks) {
 
-      bool wasInPhantom = false;
-      bool isInPhantom = false;
-      bool isInDetector = false;
-      bool is511 = false;
+      double gamma1X, gamma2X, gammaPromptX;
+      double gamma1Y, gamma2Y, gammaPromptY;
 
+      auto &rozp = track.fTrackID;
+      double emissionEnergy = track.fEmissionEnergy;
       auto &steps = track.fTrackInteractions;
       int counterAboveCut = 0;
+       
+      
+
       for (auto i = 0u; i < steps.size(); i++) {
         auto &hit = steps[i];
-        is511 =isScattering511(hit);
-        isInPhantom = isScatteringInPhantom(hit);
-        isInDetector = !isInPhantom;
-        if(is511){
-          std::cout << "It is 511! " << std::endl;
-        }
-        if(isInDetector) {
-          if(wasInPhantom) {
-          h.Fill(hit.fEnergyDeposition);
-        } else {
-          ///second histogram 
-          }
-        }
 
-        if (isInPhantom) {
-          wasInPhantom =  true;
-        }
-      }
-    }
+        if (exactlyThreeHitsInEvent(*event))
+        {
+          if (rozp == 2 && isEqual(emissionEnergy,511))
+          {
+          
+          gamma1 = TLorentzVector(hit.fHitPosition, hit.fEnergyDeposition);
+          gamma1X = gamma1.Vect().X();
+          gamma1Y = gamma1.Vect().Y();
+          gamma511Pos1.push_back(gamma1);
+          
+          hgamma1X.Fill(gamma1X);
+          }
+          if (rozp == 3 && isEqual(emissionEnergy,511))
+          {
+            gamma2 = TLorentzVector(hit.fHitPosition, hit.fEnergyDeposition);
+            gamma2X = gamma2.Vect().X();
+            gamma2Y = gamma2.Vect().Y();
+            gamma511Pos2.push_back(gamma2);
+            hgamma2X.Fill(gamma2X);
+          }
+        
+          if (rozp == 1 && isEqual(emissionEnergy,1157))
+          {
+          gammaPrompt = TLorentzVector(hit.fHitPosition, hit.fEnergyDeposition);
+          gammaPromptPos.push_back(gammaPrompt);
+          hpromptX.Fill(gammaPrompt.X());
+
+          }
+        } 
+
+      }     
   }
+   
+  
+  }
+
+  int eventstep = gammaPromptPos.size();
+  //assert(eventstep==110);
+  Double_t number[eventstep];
+  Double_t gamma1gamma2 [eventstep];
+   for (Int_t i = 0; i < eventstep ; i++) {
+        gamma1gamma2[i]=calculateDistance(gamma511Pos1[i].X(), gamma511Pos1[i].Y(), gamma511Pos2[i].X(), gamma511Pos2[i].Y());
+        number[i]=i;
+        hgamma1prompt.Fill(calculateDistance(gammaPromptPos[i].X(), gammaPromptPos[i].Y(), gamma511Pos2[i].X(), gamma511Pos2[i].Y()));
+        hgamma2prompt.Fill(calculateDistance(gammaPromptPos[i].X(), gammaPromptPos[i].Y(), gamma511Pos1[i].X(), gamma511Pos1[i].Y()));
+        hgamma1gamma2.Fill(calculateDistance(gamma511Pos1[i].X(), gamma511Pos1[i].Y(), gamma511Pos2[i].X(), gamma511Pos2[i].Y()));
+
+      }
+    //  gamma1gamma2_wykres = new TGraph(eventstep, gamma1gamma2, number);
+      
   testOut.cd();
-  h.Write();
+  hgamma1X.Write();
+  hgamma2X.Write();
+  hpromptX.Write();
+  hgamma1gamma2.Write();
+  hgamma2prompt.Write();
+  hgamma1prompt.Write();
+  //gamma1gamma2_wykres->Write();
   testOut.Close();
 }
 
@@ -195,15 +300,27 @@ void hardcoreExampleHowToWorkWithEventTree(const std::string &inFile) {
   TH1F h("h", "h", 500, 0, 1200);
   TFile file(inFile.c_str(), "READ");
   TTreeReader reader("Tree", &file);
-  TTreeReaderValue<Event> event(reader, "Event");
+  TTreeReaderValue<Event> event(reader, "Event"); 
+  //auto hitPosition = fHitPosition.Vect().X();
   while (reader.Next()) {
+    //auto &steps = hit.fTrackInteractions;
+
     if (exactlyTwoHitsInEvent(*event) && allHitsAboveSomeEnergyCut(*event)) {
+
       h.Fill(event->fTracks[0].fTrackInteractions[0].fEnergyDeposition);
       h.Fill(event->fTracks[1].fTrackInteractions[0].fEnergyDeposition);
     }
   }
   testOut.cd();
   h.Write();
+
+  TCanvas c8("c", "c", 2000, 1200);
+  h.SetTitle("Background 511: 1-n fantom && n detector");
+  h.GetXaxis()->SetTitle("Energy [keV]");
+  h.GetYaxis()->SetTitle("Events");
+  h.SetLineColor(kBlack);
+  h.Draw();
+  c8.SaveAs("b2_511.png");
   testOut.Close();
 }
 
@@ -253,8 +370,8 @@ int main(int argc, char *argv[]) {
     std::string out_file_name(argv[2]);
     transformToEventTree(in_file_name, out_file_name);
     //hardcoreExampleHowToWorkWithEventTree(out_file_name);
-    simpleExampleHowToWorkWithEventTree(out_file_name);
-    //simpleExampleHowToWorkWithEventTree2(out_file_name);
+    //simpleExampleHowToWorkWithEventTree(out_file_name);
+    simpleExampleHowToWorkWithEventTree2(out_file_name);
   }
   return 0;
 }
