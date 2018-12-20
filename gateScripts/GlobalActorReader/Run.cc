@@ -21,16 +21,17 @@
 
 using namespace std;
 
-void addEntryToEvent(const GlobalActorReader &gar, Event *outEvent);
-void clearEvent(Event *outEvent);
-void transformToEventTree(const std::string &inFileName,
-                          const std::string &outFileName);
+void addEntryToEvent(const GlobalActorReader& gar, Event* outEvent);
+void clearEvent(Event* outEvent);
+void transformToEventTree(const std::string& inFileName,
+                          const std::string& outFileName);
 
-void transformToEventTree(const std::string &inFileName,
-                          const std::string &outFileName) {
+void transformToEventTree(const std::string& inFileName,
+                          const std::string& outFileName)
+{
   TFile fileOut(outFileName.c_str(), "RECREATE");
-  TTree *tree = new TTree("Tree", "Tree");
-  Event *event = nullptr;
+  TTree* tree = new TTree("Tree", "Tree");
+  Event* event = nullptr;
   tree->Branch("Event", &event, 16000, 99);
   try {
     event = new Event;
@@ -63,7 +64,7 @@ void transformToEventTree(const std::string &inFileName,
     } else {
       std::cerr << "Loading file failed." << std::endl;
     }
-  } catch (const std::logic_error &e) {
+  } catch (const std::logic_error& e) {
     std::cerr << e.what() << std::endl;
   } catch (...) {
     std::cerr << "Udefined exception" << std::endl;
@@ -73,7 +74,8 @@ void transformToEventTree(const std::string &inFileName,
   fileOut.Write();
 }
 
-void simpleExampleHowToWorkWithEventTree(const std::string &inFile) {
+void simpleExampleHowToWorkWithEventTree(const std::string& inFile)
+{
 
   TFile testOut("testOutSimple.root", "RECREATE");
   TH1F h("h", "h", 500, 0, 1200);
@@ -85,12 +87,12 @@ void simpleExampleHowToWorkWithEventTree(const std::string &inFile) {
   /// at least twice above the given energy threshold.
   double cut = 200;
   while (reader.Next()) {
-    for (const auto &track : event->fTracks) {
-      auto &steps = track.fTrackInteractions;
+    for (const auto& track : event->fTracks) {
+      auto& steps = track.fTrackInteractions;
       if (steps.size() > 1) {
         int counterAboveCut = 0;
         for (auto i = 0u; i < steps.size(); i++) {
-          auto &step = steps[i];
+          auto& step = steps[i];
           if (step.fEnergyDeposition > cut)
             counterAboveCut++;
           if (counterAboveCut == 2) {
@@ -129,35 +131,35 @@ bool isEqual(double x, double y, double epsilon = 10e-9)
 
 double smearEnergy(double energy)
 {
-  int r=0;
   return r_norm(energy, 1000. * sigmaE((energy) * 1. / 1000.));
 }
 
 double calculateDistance(double x1, double y1, double x2, double y2)
 {
-double distance =0;
-distance= abs(x2*y1-y2*x1)/sqrt(pow((y2-y1),2)+pow((x2-x1),2));
-return distance;
+  double distance = 0;
+  distance = abs(x2 * y1 - y2 * x1) / sqrt(pow((y2 - y1), 2) + pow((x2 - x1), 2));
+  return distance;
 }
 
-  auto exactlyOneHit = [](const Track &track) -> bool {
-    return (track.fTrackInteractions.size() == 1);
-  };
+auto exactlyOneHit = [](const Track& track) -> bool {
+  return (track.fTrackInteractions.size() == 1);
+};
 
- auto exactlyTwoHitsInEvent = [&exactlyOneHit](const Event &event) -> bool {
-    return (event.fTracks.size() == 2) &&
-           std::all_of(event.fTracks.begin(), event.fTracks.end(),
-                       exactlyOneHit);
-  };
+auto exactlyTwoHitsInEvent = [](const Event& event) -> bool {
+  return (event.fTracks.size() == 2) &&
+  std::all_of(event.fTracks.begin(), event.fTracks.end(),
+  exactlyOneHit);
+};
 
-   auto exactlyThreeHitsInEvent = [&exactlyOneHit](const Event &event) -> bool {
-    return (event.fTracks.size() == 3) &&
-           std::all_of(event.fTracks.begin(), event.fTracks.end(),
-                       exactlyOneHit);
-  };
-    TGraph* gamma1gamma2_wykres = 0;
+auto exactlyThreeHitsInEvent = [](const Event& event) -> bool {
+  return (event.fTracks.size() == 3) &&
+  std::all_of(event.fTracks.begin(), event.fTracks.end(),
+  exactlyOneHit);
+};
+TGraph* gamma1gamma2_wykres = 0;
 
-void simpleExampleHowToWorkWithEventTree2(const std::string &inFile) {
+void simpleExampleHowToWorkWithEventTree2(const std::string& inFile)
+{
 
   TFile testOut("testOutSimple.root", "RECREATE");
   TH1F hgamma1X("hgamma1X", "h1X", 500, -1200, 1200);
@@ -181,77 +183,67 @@ void simpleExampleHowToWorkWithEventTree2(const std::string &inFile) {
   TTreeReader reader("Tree", &file);
   TTreeReaderValue<Event> event(reader, "Event");
   double cut = 200;
-  
+
   std::vector <TLorentzVector> gammaPromptPos;
   std::vector <TLorentzVector> gamma511Pos1;
   std::vector <TLorentzVector> gamma511Pos2;
-  assert(isEqual(calculateDistance(1, sqrt(3),1,-sqrt(3)),1));  
+  assert(isEqual(calculateDistance(1, sqrt(3), 1, -sqrt(3)), 1));
   while (reader.Next()) {
-      for (const auto &track : event->fTracks) {
+    for (const auto& track : event->fTracks) {
 
-      double gamma1X, gamma2X, gammaPromptX;
-      double gamma1Y, gamma2Y, gammaPromptY;
+      double gamma1X, gamma2X;
 
-      auto &rozp = track.fTrackID;
+      auto& rozp = track.fTrackID;
       double emissionEnergy = track.fEmissionEnergy;
-      auto &steps = track.fTrackInteractions;
-      int counterAboveCut = 0;
-       
-      
+      auto& steps = track.fTrackInteractions;
 
       for (auto i = 0u; i < steps.size(); i++) {
-        auto &hit = steps[i];
+        auto& hit = steps[i];
 
-        if (exactlyThreeHitsInEvent(*event))
-        {
-          if (rozp == 2 && isEqual(emissionEnergy,511))
-          {
-          
-          gamma1 = TLorentzVector(hit.fHitPosition, hit.fEnergyDeposition);
-          gamma1X = gamma1.Vect().X();
-          gamma1Y = gamma1.Vect().Y();
-          gamma511Pos1.push_back(gamma1);
-          
-          hgamma1X.Fill(gamma1X);
+        if (exactlyThreeHitsInEvent(*event)) {
+          if (rozp == 2 && isEqual(emissionEnergy, 511)) {
+
+            gamma1 = TLorentzVector(hit.fHitPosition, hit.fEnergyDeposition);
+            gamma1X = gamma1.Vect().X();
+            gamma511Pos1.push_back(gamma1);
+
+            hgamma1X.Fill(gamma1X);
           }
-          if (rozp == 3 && isEqual(emissionEnergy,511))
-          {
+          if (rozp == 3 && isEqual(emissionEnergy, 511)) {
             gamma2 = TLorentzVector(hit.fHitPosition, hit.fEnergyDeposition);
             gamma2X = gamma2.Vect().X();
-            gamma2Y = gamma2.Vect().Y();
             gamma511Pos2.push_back(gamma2);
             hgamma2X.Fill(gamma2X);
           }
-        
-          if (rozp == 1 && isEqual(emissionEnergy,1157))
-          {
-          gammaPrompt = TLorentzVector(hit.fHitPosition, hit.fEnergyDeposition);
-          gammaPromptPos.push_back(gammaPrompt);
-          hpromptX.Fill(gammaPrompt.X());
+
+          if (rozp == 1 && isEqual(emissionEnergy, 1157)) {
+            gammaPrompt = TLorentzVector(hit.fHitPosition, hit.fEnergyDeposition);
+            gammaPromptPos.push_back(gammaPrompt);
+            hpromptX.Fill(gammaPrompt.X());
 
           }
-        } 
+        }
 
-      }     
-  }
-   
-  
+      }
+    }
+
+
   }
 
   int eventstep = gammaPromptPos.size();
   //assert(eventstep==110);
-  Double_t number[eventstep];
-  Double_t gamma1gamma2 [eventstep];
-   for (Int_t i = 0; i < eventstep ; i++) {
-        gamma1gamma2[i]=calculateDistance(gamma511Pos1[i].X(), gamma511Pos1[i].Y(), gamma511Pos2[i].X(), gamma511Pos2[i].Y());
-        number[i]=i;
-        hgamma1prompt.Fill(calculateDistance(gammaPromptPos[i].X(), gammaPromptPos[i].Y(), gamma511Pos2[i].X(), gamma511Pos2[i].Y()));
-        hgamma2prompt.Fill(calculateDistance(gammaPromptPos[i].X(), gammaPromptPos[i].Y(), gamma511Pos1[i].X(), gamma511Pos1[i].Y()));
-        hgamma1gamma2.Fill(calculateDistance(gamma511Pos1[i].X(), gamma511Pos1[i].Y(), gamma511Pos2[i].X(), gamma511Pos2[i].Y()));
+  //Double_t number[eventstep];
+  //Double_t gamma1gamma2 [eventstep];
+  for (Int_t i = 0; i < eventstep ; i++) {
+    //gamma1gamma2[i] = calculateDistance(gamma511Pos1[i].X(), gamma511Pos1[i].Y(), gamma511Pos2[i].X(), gamma511Pos2[i].Y());
+    //number[i] = i;
+    hgamma1prompt.Fill(calculateDistance(gammaPromptPos[i].X(), gammaPromptPos[i].Y(), gamma511Pos2[i].X(), gamma511Pos2[i].Y()));
+    hgamma2prompt.Fill(calculateDistance(gammaPromptPos[i].X(), gammaPromptPos[i].Y(), gamma511Pos1[i].X(), gamma511Pos1[i].Y()));
+    hgamma1gamma2.Fill(calculateDistance(gamma511Pos1[i].X(), gamma511Pos1[i].Y(), gamma511Pos2[i].X(), gamma511Pos2[i].Y()));
 
-      }
-    //  gamma1gamma2_wykres = new TGraph(eventstep, gamma1gamma2, number);
-      
+  }
+  //  gamma1gamma2_wykres = new TGraph(eventstep, gamma1gamma2, number);
+
   testOut.cd();
   hgamma1X.Write();
   hgamma2X.Write();
@@ -263,68 +255,70 @@ void simpleExampleHowToWorkWithEventTree2(const std::string &inFile) {
   testOut.Close();
 }
 
-void hardcoreExampleHowToWorkWithEventTree(const std::string &inFile) {
+//void hardcoreExampleHowToWorkWithEventTree(const std::string& inFile)
+//{
 
-  auto exactlyOneHit = [](const Track &track) -> bool {
-    return (track.fTrackInteractions.size() == 1);
-  };
-  auto exactlyTwoHitsInEvent = [&exactlyOneHit](const Event &event) -> bool {
-    return (event.fTracks.size() == 2) &&
-           std::all_of(event.fTracks.begin(), event.fTracks.end(),
-                       exactlyOneHit);
-  };
+  //auto exactlyOneHit = [](const Track & track) -> bool {
+    //return (track.fTrackInteractions.size() == 1);
+  //};
+  //auto exactlyTwoHitsInEvent = [&exactlyOneHit](const Event & event) -> bool {
+    //return (event.fTracks.size() == 2) &&
+    //std::all_of(event.fTracks.begin(), event.fTracks.end(),
+    //exactlyOneHit);
+  //};
 
-  auto scattering511 = [](const TrackInteraction &hit) -> bool {
-    return (hit.fEnergyBeforeProcess == 511);
-  };
-  auto onlyfirstScattering511 = [scattering511](const Track &track) -> bool {
-    return (track.fTrackInteractions.size() == 1) &&
-           scattering511(track.fTrackInteractions.front());
-  };
+  //auto scattering511 = [](const TrackInteraction & hit) -> bool {
+    //return (hit.fEnergyBeforeProcess == 511);
+  //};
+  //auto onlyfirstScattering511 = [scattering511](const Track & track) -> bool {
+    //return (track.fTrackInteractions.size() == 1) &&
+    //scattering511(track.fTrackInteractions.front());
+  //};
 
-  double energyCut = 200;
-  auto aboveEnergy = [energyCut](const TrackInteraction &hit) -> bool {
-    return (hit.fEnergyDeposition > energyCut);
-  };
-  auto atLeastOneAbove = [energyCut, &aboveEnergy](const Track &track) -> bool {
-    return std::any_of(track.fTrackInteractions.begin(),
-                       track.fTrackInteractions.end(), aboveEnergy);
-  };
-  auto allHitsAboveSomeEnergyCut =
-      [energyCut, &atLeastOneAbove](const Event &event) -> bool {
-    return std::all_of(event.fTracks.begin(), event.fTracks.end(),
-                       atLeastOneAbove);
-  };
+  //double energyCut = 200;
+  //auto aboveEnergy = [energyCut](const TrackInteraction & hit) -> bool {
+    //return (hit.fEnergyDeposition > energyCut);
+  //};
+  //auto atLeastOneAbove = [energyCut, &aboveEnergy](const Track & track) -> bool {
+    //return std::any_of(track.fTrackInteractions.begin(),
+    //track.fTrackInteractions.end(), aboveEnergy);
+  //};
+  //auto allHitsAboveSomeEnergyCut =
+  //[energyCut, &atLeastOneAbove](const Event & event) -> bool {
+    //return std::all_of(event.fTracks.begin(), event.fTracks.end(),
+    //atLeastOneAbove);
+  //};
 
-  TFile testOut("testOut.root", "RECREATE");
-  TH1F h("h", "h", 500, 0, 1200);
-  TFile file(inFile.c_str(), "READ");
-  TTreeReader reader("Tree", &file);
-  TTreeReaderValue<Event> event(reader, "Event"); 
-  //auto hitPosition = fHitPosition.Vect().X();
-  while (reader.Next()) {
-    //auto &steps = hit.fTrackInteractions;
+  //TFile testOut("testOut.root", "RECREATE");
+  //TH1F h("h", "h", 500, 0, 1200);
+  //TFile file(inFile.c_str(), "READ");
+  //TTreeReader reader("Tree", &file);
+  //TTreeReaderValue<Event> event(reader, "Event");
+  ////auto hitPosition = fHitPosition.Vect().X();
+  //while (reader.Next()) {
+    ////auto &steps = hit.fTrackInteractions;
 
-    if (exactlyTwoHitsInEvent(*event) && allHitsAboveSomeEnergyCut(*event)) {
+    //if (exactlyTwoHitsInEvent(*event) && allHitsAboveSomeEnergyCut(*event)) {
 
-      h.Fill(event->fTracks[0].fTrackInteractions[0].fEnergyDeposition);
-      h.Fill(event->fTracks[1].fTrackInteractions[0].fEnergyDeposition);
-    }
-  }
-  testOut.cd();
-  h.Write();
+      //h.Fill(event->fTracks[0].fTrackInteractions[0].fEnergyDeposition);
+      //h.Fill(event->fTracks[1].fTrackInteractions[0].fEnergyDeposition);
+    //}
+  //}
+  //testOut.cd();
+  //h.Write();
 
-  TCanvas c8("c", "c", 2000, 1200);
-  h.SetTitle("Background 511: 1-n fantom && n detector");
-  h.GetXaxis()->SetTitle("Energy [keV]");
-  h.GetYaxis()->SetTitle("Events");
-  h.SetLineColor(kBlack);
-  h.Draw();
-  c8.SaveAs("b2_511.png");
-  testOut.Close();
-}
+  //TCanvas c8("c", "c", 2000, 1200);
+  //h.SetTitle("Background 511: 1-n fantom && n detector");
+  //h.GetXaxis()->SetTitle("Energy [keV]");
+  //h.GetYaxis()->SetTitle("Events");
+  //h.SetLineColor(kBlack);
+  //h.Draw();
+  //c8.SaveAs("b2_511.png");
+  //testOut.Close();
+//}
 
-void addEntryToEvent(const GlobalActorReader &gar, Event *outEvent) {
+void addEntryToEvent(const GlobalActorReader& gar, Event* outEvent)
+{
   assert(outEvent);
   outEvent->fEventID = gar.GetEventID();
 
@@ -336,7 +330,7 @@ void addEntryToEvent(const GlobalActorReader &gar, Event *outEvent) {
 
   int currentTrackID = gar.GetTrackID();
   if (!outEvent->fTracks.empty()) {
-    auto &lastTrack = outEvent->fTracks.back();
+    auto& lastTrack = outEvent->fTracks.back();
     if (lastTrack.fTrackID == currentTrackID) {
       lastTrack.fTrackInteractions.push_back(trkStep);
     } else {
@@ -355,13 +349,15 @@ void addEntryToEvent(const GlobalActorReader &gar, Event *outEvent) {
   }
 }
 
-void clearEvent(Event *outEvent) {
+void clearEvent(Event* outEvent)
+{
   assert(outEvent);
   outEvent->fEventID = -1;
   outEvent->fTracks.clear();
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[])
+{
   if (argc != 3) {
     std::cerr << "Invalid number of variables." << std::endl;
     std::cerr << "usage: ./GAR inputFile.root outputFile.root" << std::endl;
