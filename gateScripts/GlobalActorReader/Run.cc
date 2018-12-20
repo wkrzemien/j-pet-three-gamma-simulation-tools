@@ -182,7 +182,6 @@ void simpleExampleHowToWorkWithEventTree2(const std::string& inFile)
   TFile file(inFile.c_str(), "READ");
   TTreeReader reader("Tree", &file);
   TTreeReaderValue<Event> event(reader, "Event");
-  double cut = 200;
 
   std::vector <TLorentzVector> gammaPromptPos;
   std::vector <TLorentzVector> gamma511Pos1;
