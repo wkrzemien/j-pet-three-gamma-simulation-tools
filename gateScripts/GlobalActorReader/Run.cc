@@ -99,7 +99,6 @@ void analyse(const std::string& inFile)
   std::vector <TLorentzVector> gammaPromptPos;
   std::vector <TLorentzVector> gamma511Pos1;
   std::vector <TLorentzVector> gamma511Pos2;
-  assert(isEqual(calculateDistance(1, sqrt(3), 1, -sqrt(3)), 1));
   while (reader.Next()) {
     for (const auto& track : event->fTracks) {
 
@@ -167,8 +166,15 @@ void analyse(const std::string& inFile)
   testOut.Close();
 }
 
+
+void runTests()
+{
+  assert(isEqual(calculateDistance(1, sqrt(3), 1, -sqrt(3)), 1));
+}
+
 int main(int argc, char* argv[])
 {
+  runTests();
   using namespace tree_transformation;
   if (argc != 3) {
     std::cerr << "Invalid number of variables." << std::endl;
