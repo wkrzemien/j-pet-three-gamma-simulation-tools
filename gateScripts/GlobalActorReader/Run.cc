@@ -1,50 +1,23 @@
 //R__LOAD_LIBRARY(Event_h.so)
-#include "TCanvas.h"
-#include "TH1F.h"
-#include <TFile.h>
-#include <TGraph.h>
-#include <TLegend.h>
-#include <TLorentzVector.h>
-#include <TMath.h>
-#include <TRandom3.h>
-#include <TTreeReader.h>
-#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <iostream>
-#include <stdexcept>
 #include <string>
+
+#include <TH1F.h>
+#include <TFile.h>
+#include <TGraph.h>
+#include <TLorentzVector.h>
+#include <TTreeReader.h>
 
 #include "Event.h"
 #include "GlobalActorReader.hh"
 #include "TreeTransformation.h"
+#include "HelperFunctions.h"
 
 using namespace std;
+using namespace helper_functions;
 
-random_device rd;
-mt19937 gen(rd());
-
-Double_t sigmaE(Double_t E, Double_t coeff = 0.0444)
-{
-  return coeff / TMath::Sqrt(E) * E;
-}
-
-double r_norm(double mean, double sigmaE)
-{
-  normal_distribution<double> d(mean, sigmaE);
-  return d(gen);
-}
-
-bool isEqual(double x, double y, double epsilon = 10e-9)
-{
-  return std::abs(x - y) < epsilon;
-}
-
-
-double smearEnergy(double energy)
-{
-  return r_norm(energy, 1000. * sigmaE((energy) * 1. / 1000.));
-}
 
 double calculateDistance(double x1, double y1, double x2, double y2)
 {
