@@ -16,9 +16,9 @@
 #include "./Event.h"
 ClassImp(Event);
 ClassImp(Track);
-ClassImp(TrackInteraction);
+ClassImp(Hit);
 
 Event::Event() {;}
 Track::Track() {;}
-TrackInteraction::TrackInteraction() {;}
+Hit::Hit() {;}
 

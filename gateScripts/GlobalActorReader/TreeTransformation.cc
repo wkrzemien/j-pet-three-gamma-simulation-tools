@@ -72,7 +72,7 @@ void addEntryToEvent(const GlobalActorReader& gar, Event* outEvent)
   assert(outEvent);
   outEvent->fEventID = gar.GetEventID();
 
-  TrackInteraction trkStep;
+  Hit trkStep;
   trkStep.fHitPosition = gar.GetProcessPosition();
   trkStep.fEnergyDeposition = gar.GetEnergyLossDuringProcess();
   trkStep.fEnergyBeforeProcess = gar.GetEnergyBeforeProcess();
@@ -82,19 +82,19 @@ void addEntryToEvent(const GlobalActorReader& gar, Event* outEvent)
   if (!outEvent->fTracks.empty()) {
     auto& lastTrack = outEvent->fTracks.back();
     if (lastTrack.fTrackID == currentTrackID) {
-      lastTrack.fTrackInteractions.push_back(trkStep);
+      lastTrack.fHits.push_back(trkStep);
     } else {
       Track trk;
       trk.fEmissionEnergy = gar.GetEmissionEnergyFromSource();
       trk.fTrackID = currentTrackID;
-      trk.fTrackInteractions.push_back(trkStep);
+      trk.fHits.push_back(trkStep);
       outEvent->fTracks.push_back(trk);
     }
   } else {
     Track trk;
     trk.fEmissionEnergy = gar.GetEmissionEnergyFromSource();
     trk.fTrackID = currentTrackID;
-    trk.fTrackInteractions.push_back(trkStep);
+    trk.fHits.push_back(trkStep);
     outEvent->fTracks.push_back(trk);
   }
 }

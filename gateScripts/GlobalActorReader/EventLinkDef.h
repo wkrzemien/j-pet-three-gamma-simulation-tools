@@ -6,6 +6,6 @@
 
 #pragma link C++ class Event+;
 #pragma link C++ class Track+;
-#pragma link C++ class TrackInteraction+;
+#pragma link C++ class Hit+;
 
 #endif

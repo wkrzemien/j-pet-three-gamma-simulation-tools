@@ -55,7 +55,7 @@ double calculateDistance(double x1, double y1, double x2, double y2)
 }
 
 auto exactlyOneHit = [](const Track& track) -> bool {
-  return (track.fTrackInteractions.size() == 1);
+  return (track.fHits.size() == 1);
 };
 
 auto exactlyTwoHitsInEvent = [](const Event& event) -> bool {
@@ -106,7 +106,7 @@ void analyse(const std::string& inFile)
 
       auto& rozp = track.fTrackID;
       double emissionEnergy = track.fEmissionEnergy;
-      auto& steps = track.fTrackInteractions;
+      auto& steps = track.fHits;
 
       for (auto i = 0u; i < steps.size(); i++) {
         auto& hit = steps[i];
