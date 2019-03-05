@@ -3,6 +3,9 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <initializer_list>
+#include <stdlib.h>
+#include <stdio.h>
 
 #include <TH1F.h>
 #include <TFile.h>
@@ -58,9 +61,9 @@ void analyse(const std::string& inFile)
   TH1F hpromptZ("hpromptZ", "hpromptZ", 500, -1200, 1200);
   TH1F hgamma2Y("hgamma2Y", "hgamma2Y", 500, -1200, 1200);
   TH1F hgamma2Z("hgamma2Z", "hgamma2Z", 500, -1200, 1200);
-  TH1F hgamma1prompt("hgamma1prompt", "hpromptZ", 500, -1200, 1200);
-  TH1F hgamma2prompt("hgamma2prompt", "hgamma2Y", 500, -1200, 1200);
-  TH1F hgamma1gamma2("hgamma1gamma2", "hgamma2Z", 500, -1200, 1200);
+  TH1F hgamma1prompt("hgamma1prompt", "hpromptZ", 500, 0, 600);
+  TH1F hgamma2prompt("hgamma2prompt", "hgamma2Y", 500, 0, 600);
+  TH1F hgamma1gamma2("hgamma1gamma2", "hgamma2Z", 500, 0, 600);
 
   TLorentzVector gammaPrompt;
   TLorentzVector gamma1;
@@ -72,6 +75,7 @@ void analyse(const std::string& inFile)
   std::vector <TLorentzVector> gammaPromptPos;
   std::vector <TLorentzVector> gamma511Pos1;
   std::vector <TLorentzVector> gamma511Pos2;
+
   while (reader.Next()) {
     for (const auto& track : event->fTracks) {
 
@@ -110,23 +114,81 @@ void analyse(const std::string& inFile)
 
       }
     }
-
-
   }
 
   int eventstep = gammaPromptPos.size();
+  int distgamma1prompt[eventstep], distgamma2prompt[eventstep], distgamma1gamma2[eventstep];
+  int numeric = 0;
+  int numericprompt = 0;
+  int numericgamma = 0;
+  int numericgammamax = 0;
+  int numericgammamin = 0;
+  int numericgammamid = 0;
+  int g1g2 = 0;
+  int pg1 = 0;
+  int pg2 = 0;
+  double percent =0;
+
+  //bool gamma1 = false;
   //assert(eventstep==110);
   //Double_t number[eventstep];
   //Double_t gamma1gamma2 [eventstep];
   for (Int_t i = 0; i < eventstep ; i++) {
-    //gamma1gamma2[i] = calculateDistance(gamma511Pos1[i].X(), gamma511Pos1[i].Y(), gamma511Pos2[i].X(), gamma511Pos2[i].Y());
-    //number[i] = i;
-    hgamma1prompt.Fill(calculateDistance(gammaPromptPos[i].X(), gammaPromptPos[i].Y(), gamma511Pos2[i].X(), gamma511Pos2[i].Y()));
-    hgamma2prompt.Fill(calculateDistance(gammaPromptPos[i].X(), gammaPromptPos[i].Y(), gamma511Pos1[i].X(), gamma511Pos1[i].Y()));
-    hgamma1gamma2.Fill(calculateDistance(gamma511Pos1[i].X(), gamma511Pos1[i].Y(), gamma511Pos2[i].X(), gamma511Pos2[i].Y()));
 
+    distgamma1prompt[i]=calculateDistance(gammaPromptPos[i].X(), gammaPromptPos[i].Y(), gamma511Pos2[i].X(), gamma511Pos2[i].Y());
+    distgamma2prompt[i]=calculateDistance(gammaPromptPos[i].X(), gammaPromptPos[i].Y(), gamma511Pos1[i].X(), gamma511Pos1[i].Y());
+    distgamma1gamma2[i]=calculateDistance(gamma511Pos1[i].X(), gamma511Pos1[i].Y(), gamma511Pos2[i].X(), gamma511Pos2[i].Y());
+    hgamma1prompt.Fill(distgamma1prompt[i]);
+    hgamma2prompt.Fill(distgamma2prompt[i]);
+    hgamma1gamma2.Fill(distgamma1gamma2[i]);
+
+    auto maxVal= std::max({distgamma1gamma2[i],distgamma1prompt[i],distgamma2prompt[i]  });
+    auto minVal= std::min({distgamma1gamma2[i],distgamma1prompt[i],distgamma2prompt[i]  });
+    if (isEqual(maxVal, distgamma1gamma2[i])) {
+    	numericgammamax++;
+    } else {
+    	if (isEqual(minVal, distgamma1gamma2[i])) {
+    		numericgammamin++;
+
+    	} else{
+    		numericgammamid++;
+    	}
+    }
+
+    if (isEqual(maxVal, distgamma1prompt[i])||isEqual(maxVal, distgamma2prompt[i])) {
+      numericprompt++;
+    }
+    else
+    {
+      numericgamma++;
+    }
+
+    /*if (isEqual(maxVal, distgamma1prompt[i])) {
+      pg1++;
+    }
+    if (isEqual(maxVal, distgamma2prompt[i])) {
+      pg2++;
+    }
+    if (isEqual(maxVal, distgamma1gamma2[i])) {
+      g1g2++;
+    }*/
+
+    //koniec pętli for
   }
-  //  gamma1gamma2_wykres = new TGraph(eventstep, gamma1gamma2, number);
+  percent=numericgamma*100 / eventstep;
+
+    std::cout << "Results for back-to-back: " << std::endl;
+    std::cout << "Liczba gamma dla min odleglosci  " << numericgammamin <<std::endl;
+    std::cout << "Liczba gamma dla max odleglosci  " << numericgammamax <<std::endl;
+    std::cout << "Liczba gamma dla mid odleglosci  " << numericgammamid <<std::endl;
+    std::cout << "Liczba zaakceptowanych prompt:  " << numericprompt <<std::endl;
+    std::cout << "Liczba zaakceptowanych gamma jako prompt:  " << numericgamma <<std::endl;
+    std::cout << "Percent of false " << percent << "%" << std::endl;
+    std::cout << "Event steps  " << eventstep <<std::endl;
+    std::cout << "gamma1prompt  " << pg1 <<std::endl;
+    std::cout << "gamma2prompt  " << pg2 <<std::endl;
+    std::cout << "gamma1gamma2  " << g1g2 <<std::endl;
+
 
   testOut.cd();
   hgamma1X.Write();
@@ -135,7 +197,6 @@ void analyse(const std::string& inFile)
   hgamma1gamma2.Write();
   hgamma2prompt.Write();
   hgamma1prompt.Write();
-  //gamma1gamma2_wykres->Write();
   testOut.Close();
 }
 
