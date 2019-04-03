@@ -255,8 +255,6 @@ std::vector<LOR> select(const TLorentzVector& gamma1, const TLorentzVector& gamm
   return finalSelection;
 }
 
-
-
 void runTests()
 {
   assert(isEqual(calculateDistance2D(1, sqrt(3), 1, -sqrt(3)), 1));
