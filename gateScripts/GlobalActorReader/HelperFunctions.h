@@ -44,6 +44,19 @@ bool isEqual(double x, double y, double epsilon = 10e-9)
 {
   return std::abs(x - y) < epsilon;
 }
+
+double calculateDistance3D(double x1, double y1, double x2, double y2, double z1, double z2)
+{
+  if (x1 == x2 && y1 == y2 && z1 == z2) return 0;
+  // sqrt(pow(y1*(z2-z1)-z1*(y2-y1),2)+pow(x1*(z2-z1)-z1*(x2-x1),2)+pow(x1*(y2-y1)-y1*(x2-x1),2))/ sqrt(pow((y2 - y1), 2) + pow((x2 - x1), 2) + pow((z2 - z1), 2));
+  return sqrt(pow(y1 * z2 - y2 * z1, 2) + pow(x1 * z2 - z1 * x2, 2) + pow(x1 * y2 - y1 * x2, 2)) / sqrt(pow((y2 - y1), 2) + pow((x2 - x1), 2) + pow((z2 - z1), 2));
+}
+
+double calculateDistance2D(double x1, double y1, double x2, double y2)
+{
+  return calculateDistance3D(x1, y1, x2, y2, 0, 0);
+}
+
 }
 
 #endif /*  !HELPERFUNCTIONS_H_H */
