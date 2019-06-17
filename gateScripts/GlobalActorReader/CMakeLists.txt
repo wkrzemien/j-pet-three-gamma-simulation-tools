@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.6)
 
 #MANDATORY: Before first cmake please insert here your path to ROOT installation directory
-#set(ROOT_INSTALLATION_DIRECTORY "/home/letishion/programs/root6")
+#set(ROOT_INSTALLATION_DIRECTORY "/home/julia/root2/build")
 
 ################################################################################
 # Handling of thisroot.sh

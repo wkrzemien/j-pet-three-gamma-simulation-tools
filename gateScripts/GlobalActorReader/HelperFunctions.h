@@ -60,4 +60,3 @@ double calculateDistance2D(double x1, double y1, double x2, double y2)
 }
 
 #endif /*  !HELPERFUNCTIONS_H_H */
-
