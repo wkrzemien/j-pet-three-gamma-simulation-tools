@@ -49,6 +49,10 @@ auto exactlyOneHit = [](const Track& track) -> bool {
   return (track.fHits.size() == 1);
 };
 
+auto oneOrMoreHits = [](const Track& track) -> bool {
+  return (track.fHits.size() >= 1);
+};
+
 auto exactlyTwoHitsInEvent = [](const Event& event) -> bool {
   return (event.fTracks.size() == 2) &&
   std::all_of(event.fTracks.begin(), event.fTracks.end(),
@@ -60,6 +64,24 @@ auto exactlyThreeHitsInEvent = [](const Event& event) -> bool {
   std::all_of(event.fTracks.begin(), event.fTracks.end(),
   exactlyOneHit);
 };
+
+auto nOrMoreHitsInEvent = [](const Event& event, int N) -> bool {
+  int hits = 0;
+  for (auto track : event.fTracks)
+  {
+    hits = hits + track.fHits.size();
+  }
+  return (hits >= N);
+};
+
+int numOfHitsInEvent(const Event& event)
+{
+  int hits = 0;
+  for (const auto& track : event.fTracks)  {
+    hits = hits + track.fHits.size();
+  }
+  return hits;
+}
 
 bool isScatteringInDetector1(const Hit& step)
 {
@@ -114,7 +136,8 @@ void analyse(const std::string& inFile)
 {
 
   TFile testOut("testOutSimple.root", "RECREATE");
-  TH1F histMultiplicyt("histMultiplicyt", "histMultiplicyt", 500, -1200, 1200);
+  TH1F histMultiplicity("histMultiplicity", "histMultiplicity", 20, 0, 20);
+  TH1F histMultiplicity2("histMultiplicity2", "histMultiplicity2", 20, 0, 20);
   TH1F hgammaenergyMax("hgammaenergyMax", "hgammaenergyMax", 500, 0, 1200);
   TH1F hgammapromptenergyMax("hgammapromptenergyMax", "hgammapromptenergyMax", 500, 0, 1200);
   TH1F hgammaenergyMid("hgammaenergyMid", "hgammaenergyMid", 500, 0, 1200);
@@ -156,66 +179,65 @@ void analyse(const std::string& inFile)
   std::vector <TLorentzVector> gamma511Pos1;
   std::vector <TLorentzVector> gamma511Pos2;
 
+  //struct Triples{
+  //std::vector <TLorentzVector> trackPrompt;
+  //std::vector <TLorentzVector> track511_1;
+  //std::vector <TLorentzVector> track511_2;
+  //};
+  //std::vector<Triples> registeredEvents;
+  //registeredEvents.reserve(10000);
+
   while (reader.Next()) {
-    for (const auto& track : event->fTracks) {
+    histMultiplicity.Fill(event->fTracks.size());
+    histMultiplicity2.Fill(numOfHitsInEvent(*event));
+    if (numOfHitsInEvent(*event) < 3) {
+      continue;
+    }
 
-      double gamma1X, gamma2X;
-      //bool wasInPhantomprompt = false;
-      //bool wasInPhantom511 = false;
-      //bool isInPhantom = false;
-      //bool isInDetector = false;
-      //bool isInDetector1 = false;
-      //bool isInDetector2 = false;
-      //bool isInDetector3 = false;
-      //bool wasInDetector = false;
-      //bool is511 = false;
-      //bool isprompt = false;
-      double emissionEnergy = track.fEmissionEnergy;
-      //auto &steps_f = track.fHits;
-      auto& rozp = track.fTrackID;
-      //double emissionEnergy = track.fEmissionEnergy;
-      auto& steps = track.fHits;
+    //Triples triples;
 
-      for (auto i = 0u; i < steps.size(); i++) {
-        auto& hit = steps[i];
-        histMultiplicyt.Fill(event->fTracks.size());
-        if (exactlyThreeHitsInEvent(*event)) {
+    if (exactlyThreeHitsInEvent(*event)) {
+      for (const auto& track : event->fTracks) {
+
+        double emissionEnergy = track.fEmissionEnergy;
+        auto& rozp = track.fTrackID;
+        auto& steps = track.fHits;
+        for (auto i = 0u; i < steps.size(); i++) {
+          auto& hit = steps[i];
           if (rozp == 2 && isEqual(emissionEnergy, 511)) {
-
             gamma1 = TLorentzVector(hit.fHitPosition, hit.fEnergyDeposition);
-            gamma1X = gamma1.Vect().X();
             gamma511Pos1.push_back(gamma1);
+            //triples.track511_1.push_back(gamma1);
+          } else {
+            if (rozp == 3 && isEqual(emissionEnergy, 511)) {
+              gamma2 = TLorentzVector(hit.fHitPosition, hit.fEnergyDeposition);
+              gamma511Pos2.push_back(gamma2);
+              //triples.track511_2.push_back(gamma2);
+            } else {
+              if (rozp == 1 && isEqual(emissionEnergy, 1157)) {
+                gammaPrompt = TLorentzVector(hit.fHitPosition, hit.fEnergyDeposition);
+                gammaPromptPos.push_back(gammaPrompt);
+                //triples.trackPrompt.push_back(gammaPrompt);
 
-            hgamma1X.Fill(gamma1X);
-          }
-          if (rozp == 3 && isEqual(emissionEnergy, 511)) {
-            gamma2 = TLorentzVector(hit.fHitPosition, hit.fEnergyDeposition);
-            gamma2X = gamma2.Vect().X();
-            gamma511Pos2.push_back(gamma2);
-            hgamma2X.Fill(gamma2X);
-          }
-
-          if (rozp == 1 && isEqual(emissionEnergy, 1157)) {
-            gammaPrompt = TLorentzVector(hit.fHitPosition, hit.fEnergyDeposition);
-            gammaPromptPos.push_back(gammaPrompt);
-            hpromptX.Fill(gammaPrompt.X());
-
+              } else {
+                std::cerr << "This should never happen" << std::endl;
+                assert(1 == 0);
+              }
+            }
           }
         }
       }
     }
+    //registeredEvents.push_back(triples);
   }
+
 
   int numOfEvents = gammaPromptPos.size();
   double distgamma1prompt[numOfEvents], distgamma2prompt[numOfEvents], distgamma1gamma2[numOfEvents];
   Counter counter;
 
-  //bool gamma1 = false;
-  //assert(numOfEvents==110);
-  //Double_t number[numOfEvents];
-  //Double_t gamma1gamma2 [numOfEvents];
   std::vector<LOR> result;
-  //int A=0;
+//int A=0;
   for (Int_t i = 0; i < numOfEvents ; i++) {
 
     LOR trueLOR = {gamma511Pos1[i], gamma511Pos2[i]};
@@ -293,7 +315,8 @@ void analyse(const std::string& inFile)
   printResults(numOfEvents, counter, percent);
 
   testOut.cd();
-  histMultiplicyt.Write();
+  histMultiplicity.Write();
+  histMultiplicity2.Write();
   hgammaenergyMax.Write();
   hgammapromptenergyMax.Write();
   hgammaenergyMid.Write();
