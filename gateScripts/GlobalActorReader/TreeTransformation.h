@@ -24,7 +24,7 @@ namespace tree_transformation
 void addEntryToEvent(const GlobalActorReader& gar, Event* outEvent);
 void clearEvent(Event* outEvent);
 void transformToEventTree(const std::string& inFileName,
-                          const std::string& outFileName);
+                          const std::string& outFileName, int maxNumEvents = -1);
 
 }
 

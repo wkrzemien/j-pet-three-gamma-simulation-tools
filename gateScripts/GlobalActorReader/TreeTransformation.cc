@@ -20,7 +20,8 @@ namespace tree_transformation
 {
 
 void transformToEventTree(const std::string& inFileName,
-                          const std::string& outFileName)
+                          const std::string& outFileName,
+                          int maxNumEvents)
 {
   TFile fileOut(outFileName.c_str(), "RECREATE");
   TTree* tree = new TTree("Tree", "Tree");
@@ -34,21 +35,42 @@ void transformToEventTree(const std::string& inFileName,
       bool isFirstEvent = false;
       auto previousID = event->fEventID;
       auto currentID = previousID;
-      while (gar.Read()) {
-        currentID = gar.GetEventID();
-        isFirstEvent = (previousID < 0) && (currentID > 0);
-        isNewEvent = currentID != previousID;
+      if (maxNumEvents >= 0) {
+        int currSeq = 0;
+        while (gar.Read() && (currSeq < maxNumEvents)) {
+          currSeq++;
+          currentID = gar.GetEventID();
+          isFirstEvent = (previousID < 0) && (currentID > 0);
+          isNewEvent = currentID != previousID;
 
-        if (isFirstEvent) {
-          addEntryToEvent(gar, event);
-        } else {
-          if (isNewEvent) {
-            tree->Fill();
-            clearEvent(event);
+          if (isFirstEvent) {
+            addEntryToEvent(gar, event);
+          } else {
+            if (isNewEvent) {
+              tree->Fill();
+              clearEvent(event);
+            }
+            addEntryToEvent(gar, event);
           }
-          addEntryToEvent(gar, event);
+          previousID = currentID;
         }
-        previousID = currentID;
+      } else {
+        while (gar.Read()) {
+          currentID = gar.GetEventID();
+          isFirstEvent = (previousID < 0) && (currentID > 0);
+          isNewEvent = currentID != previousID;
+
+          if (isFirstEvent) {
+            addEntryToEvent(gar, event);
+          } else {
+            if (isNewEvent) {
+              tree->Fill();
+              clearEvent(event);
+            }
+            addEntryToEvent(gar, event);
+          }
+          previousID = currentID;
+        }
       }
       if (event->fEventID > 0) {
         tree->Fill();
