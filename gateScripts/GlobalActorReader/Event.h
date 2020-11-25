@@ -21,9 +21,9 @@
 #include <TVector3.h>
 
 
-class TrackInteraction : public TObject {
+class Hit : public TObject {
 public:
-  TrackInteraction();
+  Hit();
   double fEnergyBeforeProcess = -1;
   double fEnergyDeposition = -1;
   double fLocalTime = -1;
@@ -31,7 +31,7 @@ public:
   TVector3 fHitPosition;
   TVector3 fVolumeCenter;
   std::string fVolumeName;
-  ClassDef(TrackInteraction,1)
+  ClassDef(Hit,1)
 };
 
 class Track : public TObject {
@@ -39,7 +39,7 @@ public:
   Track();
   int fTrackID = -1;
   double fEmissionEnergy = -1;
-  std::vector<TrackInteraction> fTrackInteractions;
+  std::vector<Hit> fHits;
   ClassDef(Track,1)
 };
 

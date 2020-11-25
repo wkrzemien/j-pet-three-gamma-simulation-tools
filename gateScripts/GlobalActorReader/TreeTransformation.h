@@ -10,14 +10,22 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- *  @file Event.cc
+ *  @file TreeTransformation.h
  */
 
-#include "./Event.h"
-ClassImp(Event);
-ClassImp(Track);
-ClassImp(Hit);
+#ifndef TREETRANFORMATION_H
+#define TREETRANFORMATION_H
+#include <string>
+#include "Event.h"
+#include "GlobalActorReader.hh"
 
-Event::Event() {;}
-Track::Track() {;}
-Hit::Hit() {;}
+namespace tree_transformation
+{
+void addEntryToEvent(const GlobalActorReader& gar, Event* outEvent);
+void clearEvent(Event* outEvent);
+void transformToEventTree(const std::string& inFileName,
+                          const std::string& outFileName, int maxNumEvents = -1);
+
+}
+
+#endif /*  !TREETRANFORMATION_H */
