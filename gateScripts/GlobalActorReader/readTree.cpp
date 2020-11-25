@@ -118,91 +118,116 @@ std::vector<LOR> select2(const TLorentzVector& gamma1, const TLorentzVector& gam
   return finalSelection;
 }
 
-void readTree2()
-{
-  const char* inFile = "outNew2.root"; 
-  //const char* inFile = "NEMA_git_1mln_zle.root"; 
-  const char* chainName = "Tree";
+void analyzeTree(const std::string &inFile = "outNew2.root",
+               const std::string &outFile = "out.root") {
+  const char *chainName = "Tree";
   int nEvents = 0;
   TChain chain(chainName);
-  chain.Add(inFile);
+  chain.Add(inFile.c_str());
   ROOT::RDataFrame df(chain);
-  auto getHitsPerEvent = [](const Event& event) -> int {
-  int hits = 0;
-    for (const auto& track : event.fTracks) {
-      for(const auto& hit: track.fHits) {
-         if ((!isScatteringInFantom(hit))) hits = hits + 1;
-      } 
+  auto getHitsPerEvent = [](const Event &event) -> int {
+    int hits = 0;
+    for (const auto &track : event.fTracks) {
+      for (const auto &hit : track.fHits) {
+        if ((!isScatteringInFantom(hit)))
+          hits = hits + 1;
+      }
     }
     return hits;
   };
 
-  auto getHitsPerEventWithThreshold = [](const Event& event) -> int {
+  auto getHitsPerEventWithThreshold = [](const Event &event) -> int {
     int hits = 0;
-    for (const auto& track : event.fTracks) {
-      for(const auto& hit: track.fHits) {
-         if (hit.fEnergyBeforeProcess > 200 && (!isScatteringInFantom(hit))) hits = hits + 1;
-      } 
+    for (const auto &track : event.fTracks) {
+      for (const auto &hit : track.fHits) {
+        if (hit.fEnergyBeforeProcess > 200 && (!isScatteringInFantom(hit)))
+          hits = hits + 1;
+      }
     }
     return hits;
   };
-  auto getTracksPerEvent = [](const Event& event) -> int { return event.fTracks.size(); };
+  auto getTracksPerEvent = [](const Event &event) -> int {
+    return event.fTracks.size();
+  };
   /// Does it make any sense?
 
-  ///This is probably wrong
-  auto isTrueThreeHitsInEvent = [](const Event& event) -> bool {
-    for (const auto& track : event.fTracks) {
+  /// This is probably wrong
+  auto isTrueThreeHitsInEvent = [](const Event &event) -> bool {
+    for (const auto &track : event.fTracks) {
       // auto &steps = track.fHits;
-      if (isEqual(track.fEmissionEnergy, 511) || ((track.fEmissionEnergy >1273) && (track.fEmissionEnergy <1275)) ) {
-      }
-      else
-      {
+      if (isEqual(track.fEmissionEnergy, 511) ||
+          ((track.fEmissionEnergy > 1273) && (track.fEmissionEnergy < 1275))) {
+      } else {
         return false;
       }
     }
     return true;
   };
 
-  //auto isEventScatteredInPhantom= [](const Event& event)->int {
-    //bool scattered = false;
-    // One should define properly scattered in phantom as a hit scattered in phantom and then the track should  contain next hit with energy higher than 200 keV and registered in detector
-    // In addition one should probably define a minimum energy loss in scattering in phantom to remove events with almost no scattering
-    //for (const auto& track : event.fTracks) {
-      //scattered = scattered || std::any(track.fHits(track.fHits.begin(),track.fHits(track.fHits.end(), isScatteringInFantom);
-    //}
-    //return scattered;
+  // auto isEventScatteredInPhantom= [](const Event& event)->int {
+  // bool scattered = false;
+  // One should define properly scattered in phantom as a hit scattered in
+  // phantom and then the track should  contain next hit with energy higher than
+  // 200 keV and registered in detector
+  // In addition one should probably define a minimum energy loss in scattering
+  // in phantom to remove events with almost no scattering
+  // for (const auto& track : event.fTracks) {
+  // scattered = scattered ||
+  // std::any(track.fHits(track.fHits.begin(),track.fHits(track.fHits.end(),
+  // isScatteringInFantom);
+  //}
+  // return scattered;
   //}
 
-  //auto a =  df.Filter([] (const Event& event) { return event.fTracks.size() >0; }, {"Event"}).Count().GetValue();
+  // auto a =  df.Filter([] (const Event& event) { return event.fTracks.size()
+  // >0; }, {"Event"}).Count().GetValue();
 
   auto ranged_df = df.Range(nEvents);
   auto df2 = df.Define("TracksPerEvent", getTracksPerEvent, {"Event"})
                  .Define("HitsPerEvent", getHitsPerEvent, {"Event"})
-                 .Define("HitsPerEventWithThreshold", getHitsPerEventWithThreshold, {"Event"});
-  auto hist = df2.Histo1D({"HitsPerEvent", "HitsPerEvent;nevents;multiplicity", 30, 0, 30}, "HitsPerEvent");
-  auto hist2 = df2.Histo1D({"HitsPerEventWithThreshold", "HitsPerEventWithThreshold;nevents;multiplicity", 30, 0, 30}, "HitsPerEventWithThreshold");
+                 .Define("HitsPerEventWithThreshold",
+                         getHitsPerEventWithThreshold, {"Event"});
+  auto hist = df2.Histo1D(
+      {"HitsPerEvent", "HitsPerEvent;nevents;multiplicity", 30, 0, 30},
+      "HitsPerEvent");
+  auto hist2 =
+      df2.Histo1D({"HitsPerEventWithThreshold",
+                   "HitsPerEventWithThreshold;nevents;multiplicity", 30, 0, 30},
+                  "HitsPerEventWithThreshold");
   std::unique_ptr<TCanvas> canv(new TCanvas("canv", "canv", 1920, 1080));
   canv->Divide(2, 1);
   canv->cd(1);
   hist->DrawClone();
   canv->cd(2);
   hist2->DrawClone();
-  canv->SaveAs("out.root");
+  canv->SaveAs(outFile.c_str());
 
   df2.Filter("HitsPerEventWithThreshold >=3");
 
-
-  //auto df2 = ranged_df.Alias("Edep", "EnergyLossDuringProcess");
-  //auto hist = df2.Histo1D({"EnergyBeforeProcess", "EnergyBeforeProcess;E [keV];nevents",1000, 0 ,4000}, "EnergyBeforeProcess");
-  //auto hist2 = df2.Histo1D({"EmissionEnergyFromSource", "EmissionEnergy;E [keV];nevents",500, 0 ,4000}, "EmissionEnergyFromSource");
-  //auto hist3 = df2.Filter("Edep >200").Filter("EmissionEnergyFromSource ==1157").Filter("VolumeName == \"crystal\"").Histo1D({"Edep", "Edep;Edep [keV];nevents",500, 0 ,4000}, "Edep");
-  //hist->DrawClone();
-  //hist2->DrawClone();
-
+  // auto df2 = ranged_df.Alias("Edep", "EnergyLossDuringProcess");
+  // auto hist = df2.Histo1D({"EnergyBeforeProcess", "EnergyBeforeProcess;E
+  // [keV];nevents",1000, 0 ,4000}, "EnergyBeforeProcess");
+  // auto hist2 = df2.Histo1D({"EmissionEnergyFromSource", "EmissionEnergy;E
+  // [keV];nevents",500, 0 ,4000}, "EmissionEnergyFromSource");
+  // auto hist3 = df2.Filter("Edep >200").Filter("EmissionEnergyFromSource
+  // ==1157").Filter("VolumeName == \"crystal\"").Histo1D({"Edep", "Edep;Edep
+  // [keV];nevents",500, 0 ,4000}, "Edep");
+  // hist->DrawClone();
+  // hist2->DrawClone();
 }
 
-int main()
-{
-  readTree2();
-  //readTree();
+int main(int argc, char **argv) {
+    std::string inFileName;
+    std::string outFileName;
+  if (argc != 3) {
+    std::cerr << "Invalid number of variables." << std::endl;
+    std::cerr << "usage : ./start.ext inputFile.root outputFile.root  "
+              << std::endl;
+    return -1;
+  } else {
+    inFileName = argv[1];
+    outFileName = argv[2];
+  }
+  analyzeTree(inFileName, outFileName);
+  // readTree();
 }

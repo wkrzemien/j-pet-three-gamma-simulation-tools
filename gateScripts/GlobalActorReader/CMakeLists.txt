@@ -50,7 +50,7 @@ target_link_libraries(Event ${ROOT_LIBRARIES})
 add_executable(GAR ${SOURCES} Event.cxx)
 target_link_libraries(GAR ${ROOT_LIBRARIES} Event)
 
-add_library(readTree SHARED readTree.C ${ROOT_LIBRARIES})
-add_executable(main.exe readTree.C Event.cxx)
-target_link_libraries(main.exe PRIVATE Event ${ROOT_LIBRARIES} readTree) 
+add_library(readTree SHARED readTree.cpp ${ROOT_LIBRARIES})
+add_executable(start.exe readTree.cpp Event.cxx)
+target_link_libraries(start.exe PRIVATE Event ${ROOT_LIBRARIES} readTree) 
 
