@@ -158,6 +158,11 @@ bool isScatteringInFantom2(const Hit& step)
   return step.fVolumeName == "cylinder_with_water";
 }
 
+bool isScatteringInAnyDetector(const Hit& step)
+{
+  return (isScatteringInDetector1(step) || isScatteringInDetector2(step) || isScatteringInDetector3(step));
+}
+
 
 
 auto scattering511 = [](const Hit& hit) -> bool {
