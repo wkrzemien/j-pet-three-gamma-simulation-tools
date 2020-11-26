@@ -60,6 +60,9 @@ void readTree()
 // 4. We apply energetical criterium
 // 5. We should apply temporal criterium
 
+//TODO: plot energies and energies after selections
+/// the main question is why they are so few true events registered from 
+
 using LOR = std::pair<TLorentzVector, TLorentzVector>;
 double calculateDistance(const LOR& lor)
 {
@@ -107,11 +110,20 @@ std::vector<LOR> select(const TLorentzVector& gamma1, const TLorentzVector& gamm
 }
 
 const double kEthreshold = 200;
-const double kEcut = 360;
+const double kEcut = 400;
 std::vector<LOR> select3(const std::vector<TLorentzVector>& gammas)
 {
+  if (gammas.size() == 2) 
+  {
+    std::vector<LOR> lors;
+    double E1 = gammas[0].Energy();
+    double E2 = gammas[1].Energy();
+    if (isInEnergyRange(E1, kEthreshold, kEcut) && isInEnergyRange(E2, kEthreshold, kEcut)) {
+      lors= {{gammas[0], gammas[1]}};
+    }
+    return lors;
+  }
   assert(gammas.size() ==3);
-
   return select(gammas[0], gammas[1], gammas[2], kEthreshold , kEcut);
 }
 
@@ -122,9 +134,11 @@ void analyzeTree(const std::string &inFile = "outNew2.root",
   TChain chain(chainName);
   chain.Add(inFile.c_str());
   ROOT::RDataFrame df(chain);
+
   auto getHitsPerEvent = [](const Event &event) -> int {
     int hits = 0;
     for (const auto &track : event.fTracks) {
+      if ((!isEqual(track.fEmissionEnergy, 511, 0.01)) &&(!isEqual(track.fEmissionEnergy, 1274.54, 0.01))) continue;
       for (const auto &hit : track.fHits) {
         if ((!isScatteringInFantom(hit)))
           hits = hits + 1;
@@ -136,6 +150,7 @@ void analyzeTree(const std::string &inFile = "outNew2.root",
   auto getHitsPerEventWithThreshold = [&](const Event &event) -> int {
     int hits = 0;
     for (const auto &track : event.fTracks) {
+      if ((!isEqual(track.fEmissionEnergy, 511, 0.01)) &&(!isEqual(track.fEmissionEnergy, 1274.54, 0.01))) continue;
       for (const auto &hit : track.fHits) {
         if ((hit.fEnergyDeposition > kEthreshold) && (!isScatteringInFantom(hit)) && (isScatteringInAnyDetector(hit))) {
           hits = hits + 1;
@@ -152,9 +167,10 @@ void analyzeTree(const std::string &inFile = "outNew2.root",
       [&](const Event &event) -> std::vector<TLorentzVector> {
     std::vector<TLorentzVector> photons;
     for (const auto &track : event.fTracks) {
+      if ((!isEqual(track.fEmissionEnergy, 511, 0.01)) &&(!isEqual(track.fEmissionEnergy, 1274.54, 0.01))) continue;
       for (const auto &hit : track.fHits) {
         if ((hit.fEnergyDeposition > kEthreshold) &&
-            (!isScatteringInFantom(hit)) && (isScatteringInAnyDetector(hit))) {
+            (isScatteringInAnyDetector(hit))) {
           TLorentzVector photon(hit.fHitPosition, hit.fEnergyDeposition);
           photons.push_back(photon);
         }
@@ -169,10 +185,15 @@ void analyzeTree(const std::string &inFile = "outNew2.root",
   auto selectTrue511s = [](const Event &event) -> std::vector<TLorentzVector>  {
     std::vector<TLorentzVector> photons;
     for (const auto &track : event.fTracks) {
-      if (!isEqual(track.fEmissionEnergy, 511)) continue; 
+      if ((!isEqual(track.fEmissionEnergy, 511, 0.01)) &&(!isEqual(track.fEmissionEnergy, 1274.54, 0.01))) continue;
+      if (!isEqual(track.fEmissionEnergy, 511, 0.01)) 
+      {
+        continue; 
+      }
+         
       for (const auto &hit : track.fHits) {
         if ((hit.fEnergyDeposition > kEthreshold) &&
-            (!isScatteringInFantom(hit)) && (isScatteringInAnyDetector(hit)) 
+            (isScatteringInAnyDetector(hit)) 
              ) {
           TLorentzVector photon(hit.fHitPosition, hit.fEnergyDeposition);
           photons.push_back(photon);
@@ -181,29 +202,34 @@ void analyzeTree(const std::string &inFile = "outNew2.root",
     }
     return photons;
   };
+
           //((track.fEmissionEnergy > 1273) && (track.fEmissionEnergy < 1275))) {
 //isEqual(hit.fEnergyBeforeProcess, 511)
 
-  //isSelectionCorrect= [](const std::vector<TLorentzVector>& hits)
-  /// This is probably wrong
-  //auto isTrueThreeHitsInEvent = [](const Event &event) -> bool {
-    //for (const auto &track : event.fTracks) {
-      //// auto &steps = track.fHits;
-      //if (isEqual(track.fEmissionEnergy, 511) ||
-          //((track.fEmissionEnergy > 1273) && (track.fEmissionEnergy < 1275))) {
-      //} else {
-        //return false;
-      //}
-    //}
-    //return true;
-  //};
+  auto isSelectionCorrect = [](const std::vector<LOR> &lors,
+                               std::vector<TLorentzVector> &true511s) -> int {
+    if (true511s.size() < 2)
+      return 1;
+    if (lors.size() == 0)
+      return 2;
+    if (lors.size() > 1)
+      return 3;
+    LOR trueLOR = {true511s[0], true511s[1]};
+    auto recoLOR = lors[0];
+    if (!isEqualLor(trueLOR, recoLOR))
+      return 4;
+    return 0;
+  };
 
   // auto isEventScatteredInPhantom= [](const Event& event)->int {
   // bool scattered = false;
-  // One should define properly scattered in phantom as a hit scattered in
-  // phantom and then the track should  contain next hit with energy higher than
+  // One should define properly scattered in phantom as a hit scattered
+  // in
+  // phantom and then the track should  contain next hit with energy
+  // higher than
   // 200 keV and registered in detector
-  // In addition one should probably define a minimum energy loss in scattering
+  // In addition one should probably define a minimum energy loss in
+  // scattering
   // in phantom to remove events with almost no scattering
   // for (const auto& track : event.fTracks) {
   // scattered = scattered ||
@@ -213,43 +239,67 @@ void analyzeTree(const std::string &inFile = "outNew2.root",
   // return scattered;
   //}
 
-  // auto a =  df.Filter([] (const Event& event) { return event.fTracks.size()
+  // auto a =  df.Filter([] (const Event& event) { return
+  // event.fTracks.size()
   // >0; }, {"Event"}).Count().GetValue();
-  
 
   auto ranged_df = df.Range(nEvents);
   auto df2 = df.Define("TracksPerEvent", getTracksPerEvent, {"Event"})
                  .Define("HitsPerEvent", getHitsPerEvent, {"Event"})
                  .Define("HitsPerEventWithThreshold",
                          getHitsPerEventWithThreshold, {"Event"});
-  auto hist = df2.Histo1D(
-      {"HitsPerEvent", "HitsPerEvent;nevents;multiplicity", 30, 0, 30},
-      "HitsPerEvent");
-  auto hist2 =
-      df2.Histo1D({"HitsPerEventWithThreshold",
-                   "HitsPerEventWithThreshold;nevents;multiplicity", 30, 0, 30},
-                  "HitsPerEventWithThreshold");
-  std::unique_ptr<TCanvas> canv(new TCanvas("canv", "canv", 1920, 1080));
-  canv->Divide(2, 1);
-  canv->cd(1);
-  hist->DrawClone();
-  canv->cd(2);
-  hist2->DrawClone();
-  canv->SaveAs(outFile.c_str());
 
-  //auto oneHit = df2.Filter("HitsPerEventWithThreshold ==1").Count().GetValue();
+  auto oneHit = df2.Filter("HitsPerEventWithThreshold ==1").Count().GetValue();
   auto twoHit = df2.Filter("HitsPerEventWithThreshold ==2").Count().GetValue();
   auto threeHit = df2.Filter("HitsPerEventWithThreshold ==3").Count().GetValue();
   auto fourHit = df2.Filter("HitsPerEventWithThreshold ==4").Count().GetValue();
-  std::cout << 100. * threeHit/twoHit << std::endl;
-  std::cout << 100. * fourHit/twoHit << std::endl;
+  
+  std::cout <<  oneHit << std::endl;
+  std::cout << twoHit << std::endl;
+  std::cout << threeHit << std::endl;
+  std::cout << fourHit << std::endl;
+  //std::cout << 100. * threeHit/twoHit << std::endl;
+  //std::cout << 100. * fourHit/twoHit << std::endl;
 
   auto filtered =
-      df2.Filter("HitsPerEventWithThreshold ==3")
-          .Define("true511",selectTrue511s , {"Event"}) 
+      df2.Filter("(HitsPerEventWithThreshold ==2) ||(HitsPerEventWithThreshold ==3) ")
           .Define("HitsVectors", getHitsPositionsAndEnergyInDetector, {"Event"})
-          .Define("selected511Lors", select511Lors, {"HitsVectors"});
-          .Define("isSelectionCorrect", isSelectionCorrect, {"true511","selected511Lors"});
+          .Define("true511", selectTrue511s, {"Event"})
+          .Define("selected511Lors", select511Lors, {"HitsVectors"})
+          .Define("selectionResults", isSelectionCorrect,
+                  {"selected511Lors", "true511"});
+
+  auto filtered2H = filtered.Filter("HitsPerEventWithThreshold ==2");
+  auto filtered3H = filtered.Filter("HitsPerEventWithThreshold ==3");
+  auto histSelectionResults2 = filtered2H.Histo1D({"selectionResults2Hits", ";nevents;results flag", 5, -0.5, 4.5}, "selectionResults");
+  auto histSelectionResults3 = filtered3H.Histo1D({"selectionResults3Hits", ";nevents;results flag", 5, -0.5, 4.5}, "selectionResults");
+  auto histX = new TH1F("Edep", "Edep",650, 0, 1300); 
+  auto fillEnergyHist = [&](const std::vector<TLorentzVector>& hits)->void { if(hits.size()!=2) return; for(const auto& h: hits) histX->Fill(h.Energy());
+  };
+  filtered2H.Foreach(fillEnergyHist,{"true511"});
+  //std::cout << *(filtered.Filter("HitsPerEventWithThreshold ==2").Min("selectionResults")) << std::endl;
+  //std::cout << *(filtered.Filter("HitsPerEventWithThreshold ==2").Max("selectionResults")) << std::endl;
+  //std::cout << *(filtered.Filter("HitsPerEventWithThreshold ==3").Min("selectionResults")) << std::endl;
+  //std::cout << *(filtered.Filter("HitsPerEventWithThreshold ==3").Max("selectionResults")) << std::endl;
+  //auto hist = df2.Histo1D(
+      //{"HitsPerEvent", "HitsPerEvent;nevents;multiplicity", 30, 0, 30},
+      //"HitsPerEvent");
+  //auto hist2 =
+      //df2.Histo1D({"HitsPerEventWithThreshold",
+                   //"HitsPerEventWithThreshold;nevents;multiplicity", 30, 0, 30},
+                  //"HitsPerEventWithThreshold");
+
+  std::unique_ptr<TCanvas> canv(new TCanvas("canv", "canv", 1920, 1080));
+  canv->Divide(3, 1);
+  canv->cd(1);
+  histSelectionResults2->Draw(); 
+  canv->cd(2);
+  histSelectionResults3->Draw(); 
+  canv->cd(3);
+  histX->Draw();
+  //hist->DrawClone();
+  //hist2->DrawClone();
+  canv->SaveAs(outFile.c_str());
 }
 
 int main(int argc, char **argv) {
