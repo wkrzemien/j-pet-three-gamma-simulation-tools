@@ -19,6 +19,8 @@
 using namespace std;
 using namespace helper_functions;
 using TH1DPtr = ROOT::RDF::RResultPtr<TH1D>;
+using RDF = ROOT::RDataFrame;
+using RNode = ROOT::RDF::RNode;
 
 std::string kFirstLayerName = "crystal1";
 std::string kSecondLayerName = "crystal2";
@@ -192,7 +194,6 @@ auto selectTrue511s = [](const Event& event) -> std::vector<TLorentzVector> {
     {
       continue;
     }
-
     for (const auto& hit : track.fHits)
     {
       if ((hit.fEnergyDeposition > kEthreshold) && (isScatteringInAnyDetector(hit)))
@@ -218,6 +219,32 @@ auto isSelectionCorrect = [](const std::vector<LOR>& lors, std::vector<TLorentzV
     return 4;
   return 0;
 };
+
+TH1F* plotEdep(RNode& df, const std::string& variableName = "true511")
+{
+  auto histX = new TH1F("Edep", "Edep", 650, 0, 1300);
+  auto fillEnergyHist = [&](const std::vector<TLorentzVector>& hits) -> void {
+    if (hits.size() != 2)
+      return;
+    for (const auto& h : hits)
+      histX->Fill(h.Energy());
+  };
+  df.Foreach(fillEnergyHist, {variableName});
+  return histX;
+}
+
+TH1F* plotEdep2(RNode& df, const std::string& variableName = "selected511Lors")
+{
+  auto histX = new TH1F("Edep", "Edep", 650, 0, 1300);
+  auto fillEnergyHist = [&](const std::vector<LOR>& lors) -> void {
+    for (const auto& lor : lors) {
+      histX->Fill(lor.first.Energy());
+      histX->Fill(lor.second.Energy());
+    }
+  };
+  df.Foreach(fillEnergyHist, {variableName});
+  return histX;
+}
 
 // auto isEventScatteredInPhantom= [](const Event& event)->int {
 // bool scattered = false;
@@ -263,23 +290,22 @@ void analyzeTree(const std::string &inFile = "outNew2.root",
   std::cout << threeHit << std::endl;
   std::cout << fourHit << std::endl;
 
-  auto filtered =
-      df2.Filter("(HitsPerEventWithThreshold ==2) ||(HitsPerEventWithThreshold ==3) ")
-          .Define("HitsVectors", getHitsPositionsAndEnergyInDetector, {"Event"})
-          .Define("true511", selectTrue511s, {"Event"})
-          .Define("selected511Lors", select511Lors, {"HitsVectors"})
-          .Define("selectionResults", isSelectionCorrect,
-                  {"selected511Lors", "true511"});
+  auto filtered = (RNode) df2.Filter("(HitsPerEventWithThreshold ==2) ||(HitsPerEventWithThreshold ==3) ")
+                      .Define("HitsVectors", getHitsPositionsAndEnergyInDetector, {"Event"})
+                      .Define("true511", selectTrue511s, {"Event"})
+                      .Define("selected511Lors", select511Lors, {"HitsVectors"})
+                      .Define("selectionResults", isSelectionCorrect, {"selected511Lors", "true511"})
+                      .Define("numberOfTrue511PerEvent",[](const std::vector<TLorentzVector>& true511s)->int { return true511s.size();} ,{ "true511"}); 
 
-  auto filtered2H = filtered.Filter("HitsPerEventWithThreshold ==2");
-  auto filtered3H = filtered.Filter("HitsPerEventWithThreshold ==3");
+  auto filtered2H = (RNode) filtered.Filter("HitsPerEventWithThreshold ==2");
+  auto filtered3H = (RNode) filtered.Filter("HitsPerEventWithThreshold ==3");
   auto histSelectionResults2 = filtered2H.Histo1D({"selectionResults2Hits", ";nevents;results flag", 5, -0.5, 4.5}, "selectionResults");
   auto histSelectionResults3 = filtered3H.Histo1D({"selectionResults3Hits", ";nevents;results flag", 5, -0.5, 4.5}, "selectionResults");
-  auto histX = new TH1F("Edep", "Edep",650, 0, 1300); 
-  auto fillEnergyHist = [&](const std::vector<TLorentzVector>& hits)->void { if(hits.size()!=2) return; for(const auto& h: hits) histX->Fill(h.Energy());
-  };
-  filtered2H.Foreach(fillEnergyHist,{"true511"});
-  
+  auto hNumberOfTrue511s = filtered.Histo1D({"hNumberOfTrue511s", ";nevents;number of true 511", 5, 0,5}, "numberOfTrue511PerEvent");
+  //auto hEdep = plotEdep(filtered2H);
+  auto  testdf = (RNode) filtered2H.Filter("numberOfTrue511PerEvent ==0");
+  //auto hEdep2 = plotEdep2(testdf,"selected511Lors"); 
+  auto hEdep3 = plotEdep(filtered2H, "HitsVectors");
   //auto hist = df2.Histo1D(
       //{"HitsPerEvent", "HitsPerEvent;nevents;multiplicity", 30, 0, 30},
       //"HitsPerEvent");
@@ -289,15 +315,15 @@ void analyzeTree(const std::string &inFile = "outNew2.root",
                   //"HitsPerEventWithThreshold");
 
   std::unique_ptr<TCanvas> canv(new TCanvas("canv", "canv", 1920, 1080));
-  canv->Divide(3, 1);
+  canv->Divide(2, 2);
   canv->cd(1);
   histSelectionResults2->Draw(); 
   canv->cd(2);
   histSelectionResults3->Draw(); 
   canv->cd(3);
-  histX->Draw();
-  //hist->DrawClone();
-  //hist2->DrawClone();
+  hEdep3->Draw();
+  canv->cd(4);
+  hNumberOfTrue511s->Draw(); 
   canv->SaveAs(outFile.c_str());
 }
 
