@@ -127,127 +127,131 @@ std::vector<LOR> select3(const std::vector<TLorentzVector>& gammas)
   return select(gammas[0], gammas[1], gammas[2], kEthreshold , kEcut);
 }
 
+/// Lambdas for selection
+auto isEmissionEnergyCloseTo511or1274 = [](double emissionEnergy)->bool 
+{
+  return isEqual(emissionEnergy, 511, 0.01) ||isEqual(emissionEnergy, 1274.54, 0.01);
+};
+
+
+auto getHitsInDetectorPerEvent = [](const Event& event) -> int {
+  int hits = 0;
+  for (const auto& track : event.fTracks)
+  {
+      if (!isEmissionEnergyCloseTo511or1274(track.fEmissionEnergy)) continue;
+      for (const auto &hit : track.fHits) {
+      if ((!isScatteringInFantom(hit)))
+        hits = hits + 1;
+      }
+  }
+  return hits;
+};
+
+auto getHitsInDetectorPerEventWithThreshold = [&](const Event& event) -> int {
+  int hits = 0;
+  for (const auto& track : event.fTracks)
+  {
+      if (!isEmissionEnergyCloseTo511or1274(track.fEmissionEnergy)) continue;
+      for (const auto &hit : track.fHits) {
+      if ((hit.fEnergyDeposition > kEthreshold) && (!isScatteringInFantom(hit)) && (isScatteringInAnyDetector(hit)))
+      {
+        hits = hits + 1;
+      }
+      }
+  }
+  return hits;
+};
+
+auto getTracksPerEvent = [](const Event& event) -> int { return event.fTracks.size(); };
+
+auto getHitsPositionsAndEnergyInDetector = [&](const Event& event) -> std::vector<TLorentzVector> {
+  std::vector<TLorentzVector> photons;
+  for (const auto& track : event.fTracks)
+  {
+    if (!isEmissionEnergyCloseTo511or1274(track.fEmissionEnergy)) continue;
+    for (const auto& hit : track.fHits)
+    {
+      if ((hit.fEnergyDeposition > kEthreshold) && (isScatteringInAnyDetector(hit)))
+      {
+        TLorentzVector photon(hit.fHitPosition, hit.fEnergyDeposition);
+        photons.push_back(photon);
+      }
+    }
+  }
+  return photons;
+};
+
+auto select511Lors = [](const std::vector<TLorentzVector>& hits) { return select3(hits); };
+
+auto selectTrue511s = [](const Event& event) -> std::vector<TLorentzVector> {
+  std::vector<TLorentzVector> photons;
+  for (const auto& track : event.fTracks)
+  {
+    if (!isEmissionEnergyCloseTo511or1274(track.fEmissionEnergy)) continue;
+    if (!isEqual(track.fEmissionEnergy, 511, 0.01))
+    {
+      continue;
+    }
+
+    for (const auto& hit : track.fHits)
+    {
+      if ((hit.fEnergyDeposition > kEthreshold) && (isScatteringInAnyDetector(hit)))
+      {
+        TLorentzVector photon(hit.fHitPosition, hit.fEnergyDeposition);
+        photons.push_back(photon);
+      }
+    }
+  }
+  return photons;
+};
+
+auto isSelectionCorrect = [](const std::vector<LOR>& lors, std::vector<TLorentzVector>& true511s) -> int {
+  if (true511s.size() < 2)
+    return 1;
+  if (lors.size() == 0)
+    return 2;
+  if (lors.size() > 1)
+    return 3;
+  LOR trueLOR = {true511s[0], true511s[1]};
+  auto recoLOR = lors[0];
+  if (!isEqualLor(trueLOR, recoLOR))
+    return 4;
+  return 0;
+};
+
+// auto isEventScatteredInPhantom= [](const Event& event)->int {
+// bool scattered = false;
+// One should define properly scattered in phantom as a hit scattered
+// in
+// phantom and then the track should  contain next hit with energy
+// higher than
+// 200 keV and registered in detector
+// In addition one should probably define a minimum energy loss in
+// scattering
+// in phantom to remove events with almost no scattering
+// for (const auto& track : event.fTracks) {
+// scattered = scattered ||
+// std::any(track.fHits(track.fHits.begin(),track.fHits(track.fHits.end(),
+// isScatteringInFantom);
+//}
+// return scattered;
+//}
+
 void analyzeTree(const std::string &inFile = "outNew2.root",
                const std::string &outFile = "out.root") {
+
   const char *chainName = "Tree";
   int nEvents = 0;
   TChain chain(chainName);
   chain.Add(inFile.c_str());
   ROOT::RDataFrame df(chain);
 
-  auto getHitsPerEvent = [](const Event &event) -> int {
-    int hits = 0;
-    for (const auto &track : event.fTracks) {
-      if ((!isEqual(track.fEmissionEnergy, 511, 0.01)) &&(!isEqual(track.fEmissionEnergy, 1274.54, 0.01))) continue;
-      for (const auto &hit : track.fHits) {
-        if ((!isScatteringInFantom(hit)))
-          hits = hits + 1;
-      }
-    }
-    return hits;
-  };
-
-  auto getHitsPerEventWithThreshold = [&](const Event &event) -> int {
-    int hits = 0;
-    for (const auto &track : event.fTracks) {
-      if ((!isEqual(track.fEmissionEnergy, 511, 0.01)) &&(!isEqual(track.fEmissionEnergy, 1274.54, 0.01))) continue;
-      for (const auto &hit : track.fHits) {
-        if ((hit.fEnergyDeposition > kEthreshold) && (!isScatteringInFantom(hit)) && (isScatteringInAnyDetector(hit))) {
-          hits = hits + 1;
-        }
-      }
-    }
-    return hits;
-  };
-  auto getTracksPerEvent = [](const Event &event) -> int {
-    return event.fTracks.size();
-  };
-
-  auto getHitsPositionsAndEnergyInDetector =
-      [&](const Event &event) -> std::vector<TLorentzVector> {
-    std::vector<TLorentzVector> photons;
-    for (const auto &track : event.fTracks) {
-      if ((!isEqual(track.fEmissionEnergy, 511, 0.01)) &&(!isEqual(track.fEmissionEnergy, 1274.54, 0.01))) continue;
-      for (const auto &hit : track.fHits) {
-        if ((hit.fEnergyDeposition > kEthreshold) &&
-            (isScatteringInAnyDetector(hit))) {
-          TLorentzVector photon(hit.fHitPosition, hit.fEnergyDeposition);
-          photons.push_back(photon);
-        }
-      }
-    }
-    return photons;
-  };
-
-
-  auto select511Lors = [](const std::vector<TLorentzVector>& hits){ return select3(hits);};
-  
-  auto selectTrue511s = [](const Event &event) -> std::vector<TLorentzVector>  {
-    std::vector<TLorentzVector> photons;
-    for (const auto &track : event.fTracks) {
-      if ((!isEqual(track.fEmissionEnergy, 511, 0.01)) &&(!isEqual(track.fEmissionEnergy, 1274.54, 0.01))) continue;
-      if (!isEqual(track.fEmissionEnergy, 511, 0.01)) 
-      {
-        continue; 
-      }
-         
-      for (const auto &hit : track.fHits) {
-        if ((hit.fEnergyDeposition > kEthreshold) &&
-            (isScatteringInAnyDetector(hit)) 
-             ) {
-          TLorentzVector photon(hit.fHitPosition, hit.fEnergyDeposition);
-          photons.push_back(photon);
-        }
-      }
-    }
-    return photons;
-  };
-
-          //((track.fEmissionEnergy > 1273) && (track.fEmissionEnergy < 1275))) {
-//isEqual(hit.fEnergyBeforeProcess, 511)
-
-  auto isSelectionCorrect = [](const std::vector<LOR> &lors,
-                               std::vector<TLorentzVector> &true511s) -> int {
-    if (true511s.size() < 2)
-      return 1;
-    if (lors.size() == 0)
-      return 2;
-    if (lors.size() > 1)
-      return 3;
-    LOR trueLOR = {true511s[0], true511s[1]};
-    auto recoLOR = lors[0];
-    if (!isEqualLor(trueLOR, recoLOR))
-      return 4;
-    return 0;
-  };
-
-  // auto isEventScatteredInPhantom= [](const Event& event)->int {
-  // bool scattered = false;
-  // One should define properly scattered in phantom as a hit scattered
-  // in
-  // phantom and then the track should  contain next hit with energy
-  // higher than
-  // 200 keV and registered in detector
-  // In addition one should probably define a minimum energy loss in
-  // scattering
-  // in phantom to remove events with almost no scattering
-  // for (const auto& track : event.fTracks) {
-  // scattered = scattered ||
-  // std::any(track.fHits(track.fHits.begin(),track.fHits(track.fHits.end(),
-  // isScatteringInFantom);
-  //}
-  // return scattered;
-  //}
-
-  // auto a =  df.Filter([] (const Event& event) { return
-  // event.fTracks.size()
-  // >0; }, {"Event"}).Count().GetValue();
 
   auto ranged_df = df.Range(nEvents);
   auto df2 = df.Define("TracksPerEvent", getTracksPerEvent, {"Event"})
-                 .Define("HitsPerEvent", getHitsPerEvent, {"Event"})
+                 .Define("HitsPerEvent", getHitsInDetectorPerEvent, {"Event"})
                  .Define("HitsPerEventWithThreshold",
-                         getHitsPerEventWithThreshold, {"Event"});
+                         getHitsInDetectorPerEventWithThreshold, {"Event"});
 
   auto oneHit = df2.Filter("HitsPerEventWithThreshold ==1").Count().GetValue();
   auto twoHit = df2.Filter("HitsPerEventWithThreshold ==2").Count().GetValue();
@@ -258,8 +262,6 @@ void analyzeTree(const std::string &inFile = "outNew2.root",
   std::cout << twoHit << std::endl;
   std::cout << threeHit << std::endl;
   std::cout << fourHit << std::endl;
-  //std::cout << 100. * threeHit/twoHit << std::endl;
-  //std::cout << 100. * fourHit/twoHit << std::endl;
 
   auto filtered =
       df2.Filter("(HitsPerEventWithThreshold ==2) ||(HitsPerEventWithThreshold ==3) ")
@@ -277,10 +279,7 @@ void analyzeTree(const std::string &inFile = "outNew2.root",
   auto fillEnergyHist = [&](const std::vector<TLorentzVector>& hits)->void { if(hits.size()!=2) return; for(const auto& h: hits) histX->Fill(h.Energy());
   };
   filtered2H.Foreach(fillEnergyHist,{"true511"});
-  //std::cout << *(filtered.Filter("HitsPerEventWithThreshold ==2").Min("selectionResults")) << std::endl;
-  //std::cout << *(filtered.Filter("HitsPerEventWithThreshold ==2").Max("selectionResults")) << std::endl;
-  //std::cout << *(filtered.Filter("HitsPerEventWithThreshold ==3").Min("selectionResults")) << std::endl;
-  //std::cout << *(filtered.Filter("HitsPerEventWithThreshold ==3").Max("selectionResults")) << std::endl;
+  
   //auto hist = df2.Histo1D(
       //{"HitsPerEvent", "HitsPerEvent;nevents;multiplicity", 30, 0, 30},
       //"HitsPerEvent");
